@@ -11,6 +11,8 @@ from accounts import accounts_view
 from profile import profile_view
 from filter_search import filter_search_view      # ⭐ NEW IMPORT
 from openposition import positions_details_view   # ⭐ NEW IMPORT
+from Matrix_lot import get_net_lot_matrix        # ⭐ NEW IMPORT
+
 
 # Initialize session state for caches (persistent across reruns)
 if 'positions_cache' not in st.session_state:
@@ -524,6 +526,31 @@ def background_position_scanner():
         # Sleep for 10 seconds before next check
         time.sleep(10)
 
+def matrix_lot_view(data):
+    st.subheader('Login vs Symbol Matrix - Net Lot')
+    st.write("This matrix shows the net lot (buy volume - sell volume) for each login across specified symbols.")
+        
+    if data.empty:
+        st.info('No account data available.')
+        return
+
+    try:
+        with st.spinner('Generating net lot matrix...'):
+            matrix_df = get_net_lot_matrix(data)
+
+        if matrix_df.empty:
+            st.info('No open positions found for the accounts.')
+        else:
+            st.dataframe(matrix_df)
+
+            # Export to CSV
+            buf = io.StringIO()
+            matrix_df.to_csv(buf, index=False)
+            st.download_button('Download Matrix CSV', data=buf.getvalue(), file_name='net_lot_matrix.csv', mime='text/csv')
+
+    except Exception as e:
+        st.error(f'Failed to generate matrix: {e}')
+
 @st.cache_data(ttl=5)
 def load_from_mt5(use_groups=True):
     """Fetch accounts from MT5 using MT5Service. Cached for 5 seconds by default."""
@@ -580,6 +607,8 @@ def main():
         st.session_state.page = "filter_search"
     if st.sidebar.button("👥 Groups", key="nav_groups"):
         st.session_state.page = "groups"
+    if st.sidebar.button("📊 Matrix Lot", key="nav_matrix_lot"):
+        st.session_state.page = "matrix_lot"
 
 
     st.sidebar.header('Data source')
@@ -673,7 +702,8 @@ def main():
         filter_search_view(data)
     elif st.session_state.page == 'groups':
         groups_view(data)
-
+    elif st.session_state.page == 'matrix_lot':
+        matrix_lot_view(data)
 
 if __name__ == '__main__':
     main()
