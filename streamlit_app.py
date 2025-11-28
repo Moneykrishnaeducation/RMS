@@ -64,6 +64,7 @@ def dashboard_view(data):
     total_accounts = len(data)
     total_balance = data.get('balance', pd.Series(0)).astype(float).sum()
     total_equity = data.get('equity', pd.Series(0)).astype(float).sum()
+    total_profit = data.get('profit', pd.Series(0)).astype(float).sum()
 
     # Card HTML templates
     card_css = """
@@ -76,20 +77,21 @@ def dashboard_view(data):
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         color: white;
         text-align: center;
-        height: 120px;
+        height: 100px;
         display: flex;
         flex-direction: column;
         justify-content: center;
+        gap:0px;
     }
     .metric-title {
         margin: 0;
-        font-size: 16px;
+        font-size: 11px;
         font-weight: normal;
         opacity: 0.9;
     }
     .metric-value {
         margin: 10px 0 0 0;
-        font-size: 28px;
+        font-size: 23px;
         font-weight: bold;
     }
     </style>
@@ -116,8 +118,17 @@ def dashboard_view(data):
     </div>
     """
 
-    # Display cards in columns
+    card_profit = f"""
+    <div class="metric-card">
+        <h3 class="metric-title">Total Profit</h3>
+        <p class="metric-value">${total_profit:,.2f}</p>
+    </div>
+    """
+
+    # Display cards in two lines (rows)
     st.markdown(card_css, unsafe_allow_html=True)
+
+    # First row: Total Accounts, Total Balance, Total Equity
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown(card_accounts, unsafe_allow_html=True)
@@ -126,7 +137,7 @@ def dashboard_view(data):
     with col3:
         st.markdown(card_equity, unsafe_allow_html=True)
 
-    # Top profit person for Real and Demo accounts
+    # Second row: Total Profit, Top Profit Person (Real), Top Profit Person (Demo)
     if 'profit' in data.columns and 'group' in data.columns and not data.empty:
         # Separate real and demo accounts
         real_accounts = data[~data['group'].str.contains('demo', case=False, na=False)]
@@ -139,8 +150,15 @@ def dashboard_view(data):
             top_real_amount = float(top_real_row.get('profit', 0))
             card_top_real = f"""
             <div class="metric-card">
-                <h3 class="metric-title">Top Profit Person (Real)</h3>
-                <p class="metric-value">{top_real_name}<br/>${top_real_amount:,.2f}</p>
+                <h3 class="metric-title">Top Profit(Real)</h3>
+                <p class="metric-value">{top_real_name}${top_real_amount:,.2f}</p>
+            </div>
+            """
+        else:
+            card_top_real = f"""
+            <div class="metric-card">
+                <h3 class="metric-title">Top Profit(Real)</h3>
+                <p class="metric-value">No Data</p>
             </div>
             """
 
@@ -151,19 +169,26 @@ def dashboard_view(data):
             top_demo_amount = float(top_demo_row.get('profit', 0))
             card_top_demo = f"""
             <div class="metric-card">
-                <h3 class="metric-title">Top Profit Person (Demo)</h3>
-                <p class="metric-value">{top_demo_name}<br/>${top_demo_amount:,.2f}</p>
+                <h3 class="metric-title">Top Profit (Demo)</h3>
+                <p class="metric-value">{top_demo_name}${top_demo_amount:,.2f}</p>
+            </div>
+            """
+        else:
+            card_top_demo = f"""
+            <div class="metric-card">
+                <h3 class="metric-title">Top Profit (Demo)</h3>
+                <p class="metric-value">No Data</p>
             </div>
             """
 
-        # Display additional cards in columns
-        col4, col5 = st.columns(2)
-        if not real_accounts.empty:
-            with col4:
-                st.markdown(card_top_real, unsafe_allow_html=True)
-        if not demo_accounts.empty:
-            with col5:
-                st.markdown(card_top_demo, unsafe_allow_html=True)
+        # Second row
+        col4, col5, col6 = st.columns(3)
+        with col4:
+            st.markdown(card_profit, unsafe_allow_html=True)
+        with col5:
+            st.markdown(card_top_real, unsafe_allow_html=True)
+        with col6:
+            st.markdown(card_top_demo, unsafe_allow_html=True)
 
     # Top accounts
     st.subheader('Top accounts')
