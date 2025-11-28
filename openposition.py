@@ -2,8 +2,8 @@ import pandas as pd
 import streamlit as st
 import time
 
-# Import the persistent MT5Service getter from streamlit_app
-from streamlit_app import get_mt5_service
+# Import the persistent MT5Service getter from mt5_utils
+from mt5_utils import get_mt5_service
 
 def positions_details_view(data):
     st.subheader('Open Positions Details')
