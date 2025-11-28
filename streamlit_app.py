@@ -9,6 +9,7 @@ from MT5Service import MT5Service
 from accounts import accounts_view
 from profile import profile_view
 from filter_search import filter_search_view      # ⭐ NEW IMPORT
+from openposition import positions_details_view   # ⭐ NEW IMPORT
     
 # Custom CSS for attractive navigation bar
 nav_css = """
@@ -233,24 +234,38 @@ def positions_view(data):
     st.subheader('All Open Positions')
     svc = MT5Service()
     all_positions = []
+    total_logins = len(data['login'].unique())
+    st.write(f"Checking {total_logins} accounts for open positions...")
     for login in data['login'].unique():
         try:
             positions = svc.get_open_positions(login)
             for p in positions:
-                p['login'] = login
+                # Map the keys to match the display columns
+                position_data = {
+                    'Login': login,
+                    'ID': p.get('id'),
+                    'Symbol': p.get('symbol'),
+                    'Vol': p.get('volume'),
+                    'Price': p.get('price'),
+                    'P/L': p.get('profit'),
+                    'Type': p.get('type'),
+                    'Date': p.get('date')
+                }
                 # Add account details
                 account_row = data[data['login'] == login]
                 if not account_row.empty:
-                    p['name'] = account_row['name'].iloc[0] if 'name' in account_row.columns else ''
-                    p['email'] = account_row['email'].iloc[0] if 'email' in account_row.columns else ''
-                    p['group'] = account_row['group'].iloc[0] if 'group' in account_row.columns else ''
-                all_positions.append(p)
-        except Exception:
+                    position_data['Name'] = account_row['name'].iloc[0] if 'name' in account_row.columns else ''
+                    position_data['Email'] = account_row['email'].iloc[0] if 'email' in account_row.columns else ''
+                    position_data['Group'] = account_row['group'].iloc[0] if 'group' in account_row.columns else ''
+                all_positions.append(position_data)
+        except Exception as e:
+            st.write(f"Error fetching positions for login {login}: {e}")
             continue
+    st.write(f"Total positions found: {len(all_positions)}")
     if all_positions:
         df = pd.DataFrame(all_positions)
-        # Select only the desired columns: ID, Symbol, Vol, Price, P/L
-        desired_columns = ['ID', 'Symbol', 'Vol', 'Price', 'P/L']
+        # Select only the desired columns: Login, ID, Symbol, Vol, Price, P/L, Type, Date, Name, Group
+        desired_columns = ['Login', 'ID', 'Symbol', 'Vol', 'Price', 'P/L', 'Type', 'Date', 'Name', 'Group']
         available_columns = [col for col in desired_columns if col in df.columns]
         if available_columns:
             df_display = df[available_columns]
@@ -280,7 +295,9 @@ def positions_view(data):
         end_row = start_row + rows_per_page
         st.dataframe(df_display.iloc[start_row:end_row])
     else:
-        st.info('No open positions.')
+        st.info('No open positions found.')
+
+
 
 def pl_view(data):
     st.subheader('Profit/Loss Overview')
@@ -386,6 +403,8 @@ def main():
         st.session_state.page = "reports"
     if st.sidebar.button("📈 Open Positions", key="nav_positions"):
         st.session_state.page = "positions"
+    if st.sidebar.button("📊 Positions Details", key="nav_positions_details"):
+        st.session_state.page = "positions_details"
     if st.sidebar.button("💰 P/L", key="nav_pl"):
         st.session_state.page = "pl"
     if st.sidebar.button("🔍 Filter Search"):   # ⭐ NEW SIDEBAR BUTTON
@@ -460,6 +479,8 @@ def main():
         reports_view(data)
     elif st.session_state.page == 'positions':
         positions_view(data)
+    elif st.session_state.page == 'positions_details':
+        positions_details_view(data)
     elif st.session_state.page == 'pl':
         pl_view(data)
     elif st.session_state.page == 'filter_search':   # ⭐ NEW PAGE
