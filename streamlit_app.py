@@ -4,12 +4,32 @@ import json
 import pandas as pd
 import streamlit as st
 import time
+import threading
 
 from MT5Service import MT5Service
 from accounts import accounts_view
 from profile import profile_view
 from filter_search import filter_search_view      # ⭐ NEW IMPORT
 from openposition import positions_details_view   # ⭐ NEW IMPORT
+
+# Initialize session state for caches (persistent across reruns)
+if 'positions_cache' not in st.session_state:
+    st.session_state.positions_cache = {
+        'data': None,
+        'timestamp': 0,
+        'scanning': False,
+        'progress': {'current': 0, 'total': 0}
+    }
+
+if 'accounts_cache' not in st.session_state:
+    st.session_state.accounts_cache = {
+        'timestamp': 0,
+        'scanning': False
+    }
+
+# For backward compatibility, create references
+positions_cache = st.session_state.positions_cache
+accounts_cache = st.session_state.accounts_cache
     
 # Custom CSS for attractive navigation bar
 nav_css = """
@@ -232,37 +252,95 @@ def reports_view(data):
 
 def positions_view(data):
     st.subheader('All Open Positions')
-    svc = MT5Service()
-    all_positions = []
-    total_logins = len(data['login'].unique())
-    st.write(f"Checking {total_logins} accounts for open positions...")
-    for login in data['login'].unique():
+
+    # Use cached data from background scanner
+    global positions_cache
+
+    # Manual scan trigger
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button('🔄 Manual Scan', key='manual_scan'):
+            st.session_state.manual_scan_trigger = True
+            st.rerun()
+
+    # Show scanning status
+    st.write(f"Debug scanning status: scanning={positions_cache['scanning']}, progress={positions_cache.get('progress', {})}")
+    if positions_cache['scanning']:
+        progress = positions_cache.get('progress', {})
+        current = progress.get('current', 0)
+        total = progress.get('total', 0)
+        current_login = progress.get('current_login', '')
+        if total > 0:
+            progress_percentage = int((current / total) * 100)
+            st.progress(progress_percentage / 100)
+            st.info(f"🔄 Background position scanning in progress... {current}/{total} accounts scanned ({progress_percentage}%) - Currently scanning: {current_login}")
+        else:
+            st.info("🔄 Background position scanning in progress...")
+        time.sleep(2)  # Brief pause to allow thread updates
+        if positions_cache['scanning']:
+            st.rerun()
+    elif st.session_state.get('manual_scan_trigger', False):
+        st.session_state.manual_scan_trigger = False
+        # Trigger manual scan
         try:
-            positions = svc.get_open_positions(login)
-            for p in positions:
-                # Map the keys to match the display columns
-                position_data = {
-                    'Login': login,
-                    'ID': p.get('id'),
-                    'Symbol': p.get('symbol'),
-                    'Vol': p.get('volume'),
-                    'Price': p.get('price'),
-                    'P/L': p.get('profit'),
-                    'Type': p.get('type'),
-                    'Date': p.get('date')
-                }
-                # Add account details
-                account_row = data[data['login'] == login]
-                if not account_row.empty:
-                    position_data['Name'] = account_row['name'].iloc[0] if 'name' in account_row.columns else ''
-                    position_data['Email'] = account_row['email'].iloc[0] if 'email' in account_row.columns else ''
-                    position_data['Group'] = account_row['group'].iloc[0] if 'group' in account_row.columns else ''
-                all_positions.append(position_data)
+            st.info("🔄 Starting manual position scan...")
+            svc = MT5Service()
+            accounts = svc.list_accounts_by_groups()
+            if not accounts:
+                accounts = svc.list_accounts_by_range(start=1, end=100000)
+
+            if accounts:
+                accounts_df = pd.json_normalize(accounts)
+                if 'login' in accounts_df.columns:
+                    accounts_df['login'] = accounts_df['login'].astype(str)
+
+                    all_positions = []
+                    for login in accounts_df['login'].unique()[:10]:  # Test with first 10 accounts only
+                        try:
+                            positions = svc.get_open_positions(login)
+                            if positions:
+                                for p in positions:
+                                    position_data = {
+                                        'Login': login,
+                                        'ID': p.get('id'),
+                                        'Symbol': p.get('symbol'),
+                                        'Vol': p.get('volume'),
+                                        'Price': p.get('price'),
+                                        'P/L': p.get('profit'),
+                                        'Type': p.get('type'),
+                                        'Date': p.get('date')
+                                    }
+                                    # Add account details
+                                    account_row = accounts_df[accounts_df['login'] == login]
+                                    if not account_row.empty:
+                                        position_data['Name'] = account_row['name'].iloc[0] if 'name' in account_row.columns else ''
+                                        position_data['Email'] = account_row['email'].iloc[0] if 'email' in account_row.columns else ''
+                                        position_data['Group'] = account_row['group'].iloc[0] if 'group' in account_row.columns else ''
+                                    all_positions.append(position_data)
+                        except Exception as e:
+                            st.error(f"Error scanning positions for login {login}: {e}")
+                            continue
+
+                    positions_cache['data'] = all_positions
+                    positions_cache['timestamp'] = time.time()
+                    st.success(f"Manual scan completed: {len(all_positions)} positions found from 10 test accounts")
+            else:
+                st.error("No accounts found to scan")
         except Exception as e:
-            st.write(f"Error fetching positions for login {login}: {e}")
-            continue
-    st.write(f"Total positions found: {len(all_positions)}")
+            st.error(f"Manual scan failed: {e}")
+
+    # Get positions from cache
+    all_positions = positions_cache.get('data', [])
+    last_scan = positions_cache.get('timestamp', 0)
+    time_since_scan = time.time() - last_scan
+
+    # Debug info
+    st.write(f"Debug: positions_cache scanning={positions_cache.get('scanning', False)}, data length={len(all_positions) if all_positions else 0}, last_scan={last_scan}, time_since_scan={int(time_since_scan)}")
+
     if all_positions:
+        st.write(f"Total positions found: {len(all_positions)}")
+        st.write(f"Last updated: {int(time_since_scan)} seconds ago")
+
         df = pd.DataFrame(all_positions)
         # Select only the desired columns: Login, ID, Symbol, Vol, Price, P/L, Type, Date, Name, Group
         desired_columns = ['Login', 'ID', 'Symbol', 'Vol', 'Price', 'P/L', 'Type', 'Date', 'Name', 'Group']
@@ -295,7 +373,10 @@ def positions_view(data):
         end_row = start_row + rows_per_page
         st.dataframe(df_display.iloc[start_row:end_row])
     else:
-        st.info('No open positions found.')
+        if time_since_scan > 60:
+            st.warning("No cached position data available. Background scanner may not be running or has encountered errors.")
+        else:
+            st.info('No open positions found.')
 
 
 
@@ -361,6 +442,88 @@ def groups_view(data):
     else:
         st.info('No group data available.')
 
+def background_position_scanner():
+    """Background thread function to continuously scan open positions"""
+
+    print("Background position scanner thread started!")
+    while True:
+        try:
+            # Check if we need to scan (every 30 seconds)
+            current_time = time.time()
+            if current_time - positions_cache['timestamp'] > 30:
+                positions_cache['scanning'] = True
+                print(f"Starting background position scan at {time.strftime('%H:%M:%S')}")
+
+                # Load accounts data
+                svc = MT5Service()
+                accounts = svc.list_accounts_by_groups()
+                if not accounts:
+                    print("No accounts from groups, trying range scan...")
+                    accounts = svc.list_accounts_by_range(start=1, end=100000)
+
+                if accounts:
+                    print(f"Found {len(accounts)} accounts to scan")
+                    accounts_df = pd.json_normalize(accounts)
+                    if 'login' in accounts_df.columns:
+                        accounts_df['login'] = accounts_df['login'].astype(str)
+
+                        # Initialize progress
+                        total_accounts = len(accounts_df['login'].unique())
+                        positions_cache['progress']['total'] = total_accounts
+                        positions_cache['progress']['current'] = 0
+                        positions_cache['progress']['current_login'] = ''
+
+                        # Scan positions for all accounts
+                        all_positions = []
+                        scanned_count = 0
+                        for login in accounts_df['login'].unique():
+                            try:
+                                positions_cache['progress']['current_login'] = login
+                                positions = svc.get_open_positions(login)
+                                if positions:
+                                    for p in positions:
+                                        position_data = {
+                                            'Login': login,
+                                            'ID': p.get('id'),
+                                            'Symbol': p.get('symbol'),
+                                            'Vol': p.get('volume'),
+                                            'Price': p.get('price'),
+                                            'P/L': p.get('profit'),
+                                            'Type': p.get('type'),
+                                            'Date': p.get('date')
+                                        }
+                                        # Add account details
+                                        account_row = accounts_df[accounts_df['login'] == login]
+                                        if not account_row.empty:
+                                            position_data['Name'] = account_row['name'].iloc[0] if 'name' in account_row.columns else ''
+                                            position_data['Email'] = account_row['email'].iloc[0] if 'email' in account_row.columns else ''
+                                            position_data['Group'] = account_row['group'].iloc[0] if 'group' in account_row.columns else ''
+                                        all_positions.append(position_data)
+                                scanned_count += 1
+                                positions_cache['progress']['current'] = scanned_count
+                                if scanned_count % 100 == 0:
+                                    print(f"Scanned {scanned_count}/{total_accounts} accounts, found {len(all_positions)} positions so far")
+                            except Exception as e:
+                                print(f"Error scanning positions for login {login}: {e}")
+                                continue
+
+                        # Update cache
+                        positions_cache['data'] = all_positions
+                        positions_cache['timestamp'] = current_time
+                        print(f"Background scan completed: {len(all_positions)} positions found from {scanned_count} accounts")
+
+                else:
+                    print("No accounts found to scan")
+
+                positions_cache['scanning'] = False
+
+        except Exception as e:
+            print(f"Error in background position scanner: {e}")
+            positions_cache['scanning'] = False
+
+        # Sleep for 10 seconds before next check
+        time.sleep(10)
+
 @st.cache_data(ttl=5)
 def load_from_mt5(use_groups=True):
     """Fetch accounts from MT5 using MT5Service. Cached for 5 seconds by default."""
@@ -376,14 +539,20 @@ def load_from_mt5(use_groups=True):
 
 
 def main():
+    # Start background position scanner thread (only once)
+    if 'scanner_thread' not in st.session_state or not st.session_state.scanner_thread.is_alive():
+        st.session_state.scanner_thread = threading.Thread(target=background_position_scanner, daemon=True)
+        st.session_state.scanner_thread.start()
+
     st.set_page_config(page_title='RMS - Accounts', layout='wide')
     st.title('RMS — Accounts Dashboard (Streamlit)')
 
-    # Auto refresh every 5 seconds
+    # Auto refresh every 5 seconds, or every 1 second if scanning
     if 'last_refresh' not in st.session_state:
         st.session_state.last_refresh = time.time()
 
-    if time.time() - st.session_state.last_refresh > 5:
+    refresh_interval = 1 if positions_cache.get('scanning', False) else 5
+    if time.time() - st.session_state.last_refresh > refresh_interval:
         st.session_state.last_refresh = time.time()
         st.rerun()
 
@@ -426,11 +595,15 @@ def main():
         if refresh:
             # clear cache and re-fetch
             load_from_mt5.clear()
+        accounts_cache['scanning'] = True
         with st.spinner('Loading accounts from MT5...'):
             data = load_from_mt5(use_groups)
+        accounts_cache['scanning'] = False
+        accounts_cache['timestamp'] = time.time()
     except Exception as e:
         st.error(f'Error loading from MT5: {e}')
         data = pd.DataFrame()
+        accounts_cache['scanning'] = False
 
     if data.empty:
         st.info('No account data available.')
@@ -438,6 +611,19 @@ def main():
 
     # Debug: Show total accounts loaded
     st.sidebar.write(f"Total accounts loaded: {len(data)}")
+
+    # Global scanning status indicator
+    if positions_cache['scanning']:
+        progress = positions_cache.get('progress', {})
+        current = progress.get('current', 0)
+        total = progress.get('total', 0)
+        current_login = progress.get('current_login', '')
+        if total > 0:
+            progress_percentage = int((current / total) * 100)
+            st.sidebar.progress(progress_percentage / 100)
+            st.sidebar.info(f"🔄 Background position scanning: {current}/{total} ({progress_percentage}%) - Scanning: {current_login}")
+        else:
+            st.sidebar.info("🔄 Background position scanning in progress...")
 
     # Normalize columns and types
     if 'login' in data.columns:
@@ -472,7 +658,7 @@ def main():
     if st.session_state.page == 'dashboard':
         dashboard_view(data)
     elif st.session_state.page == 'accounts':
-        accounts_view(data)
+        accounts_view(data, accounts_cache)
     elif st.session_state.page == 'profile':
         profile_view()
     elif st.session_state.page == 'reports':
@@ -480,7 +666,7 @@ def main():
     elif st.session_state.page == 'positions':
         positions_view(data)
     elif st.session_state.page == 'positions_details':
-        positions_details_view(data)
+        positions_details_view(data, positions_cache)
     elif st.session_state.page == 'pl':
         pl_view(data)
     elif st.session_state.page == 'filter_search':   # ⭐ NEW PAGE

@@ -1,7 +1,8 @@
 import pandas as pd
 import streamlit as st
+import time
 
-def accounts_view(data):
+def accounts_view(data, accounts_cache):
     # Account type buttons
     col1, col2 = st.columns(2)
     with col1:
@@ -38,6 +39,18 @@ def accounts_view(data):
         df = df[(df['balance'].astype(float) >= min_bal) & (df['balance'].astype(float) <= max_bal)]
 
     st.subheader('Explore Accounts')
+
+    # Show account scanning status
+    if accounts_cache['scanning']:
+        st.info("🔄 Account scanning in progress...")
+    else:
+        last_scan = accounts_cache.get('timestamp', 0)
+        time_since_scan = time.time() - last_scan
+        if time_since_scan < 60:
+            st.write(f"Last loaded: {int(time_since_scan)} seconds ago")
+        else:
+            st.write(f"Last loaded: {int(time_since_scan // 60)} minutes ago")
+
     st.write(f'{len(df)} accounts matching filters')
     st.dataframe(df.head(500))
 

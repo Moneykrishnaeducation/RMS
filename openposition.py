@@ -5,65 +5,31 @@ import time
 # Import the persistent MT5Service getter from mt5_utils
 from mt5_utils import get_mt5_service
 
-def positions_details_view(data):
+def positions_details_view(data, positions_cache):
     st.subheader('Open Positions Details')
 
-    # Use the persistent MT5Service instance
-    svc = get_mt5_service()
+    # Use cached data from background scanner
 
-    # Check if we have cached positions data
-    if 'positions_data' not in st.session_state or 'positions_timestamp' not in st.session_state:
-        st.session_state.positions_data = None
-        st.session_state.positions_timestamp = 0
+    # Show scanning status
+    if positions_cache['scanning']:
+        st.info("🔄 Background position scanning in progress...")
 
-    # Refresh data if it's older than 30 seconds or doesn't exist
-    current_time = time.time()
-    if current_time - st.session_state.positions_timestamp > 30 or st.session_state.positions_data is None:
-        with st.spinner('Checking accounts for open positions...'):
-            progress_bar = st.progress(0)
-            status_text = st.empty()
+    # Get positions from cache
+    all_positions = positions_cache.get('data', [])
+    last_scan = positions_cache.get('timestamp', 0)
+    time_since_scan = time.time() - last_scan
 
-            all_positions = []
-            total_logins = len(data['login'].unique())
-            logins_list = data['login'].unique()
+    # Show account count that was scanned
+    total_accounts_scanned = len(data['login'].unique()) if not data.empty and 'login' in data.columns else 0
 
-            for i, login in enumerate(logins_list):
-                try:
-                    # Update progress
-                    progress = (i + 1) / total_logins
-                    progress_bar.progress(progress)
-                    status_text.text(f"Checking account {i+1}/{total_logins} (Login: {login})...")
-
-                    positions = svc.get_open_positions(login)
-                    for p in positions:
-                        # Map the keys to match the display columns: ID, Symbol, Vol, Price, P/L
-                        position_data = {
-                            'Login': login,  # Add login for reference
-                            'ID': p.get('id'),
-                            'Symbol': p.get('symbol'),
-                            'Vol': p.get('volume'),
-                            'Price': p.get('price'),
-                            'P/L': p.get('profit'),
-                            'Type': p.get('type')
-                        }
-                        all_positions.append(position_data)
-
-                except Exception as e:
-                    st.warning(f"Error fetching positions for login {login}: {e}")
-                    continue
-
-            # Clear progress indicators
-            progress_bar.empty()
-            status_text.empty()
-
-            # Cache the results
-            st.session_state.positions_data = all_positions
-            st.session_state.positions_timestamp = current_time
-
-            st.success(f"✅ Scan complete! Found {len(all_positions)} open positions across {total_logins} accounts.")
+    if all_positions:
+        st.write(f"Total positions found: {len(all_positions)} across {total_accounts_scanned} accounts")
+        st.write(f"Last updated: {int(time_since_scan)} seconds ago")
     else:
-        all_positions = st.session_state.positions_data
-        st.info(f"📊 Showing cached data ({len(all_positions)} positions). Click refresh to update.")
+        if time_since_scan > 60:
+            st.warning(f"No cached position data available. Background scanner may not be running or has encountered errors. (Scanned {total_accounts_scanned} accounts)")
+        else:
+            st.info(f'No open positions found from background scan. (Checked {total_accounts_scanned} accounts)')
 
     # Create DataFrame
     df = pd.DataFrame(all_positions)
@@ -92,11 +58,7 @@ def positions_details_view(data):
             unique_accounts = df_display['Login'].nunique() if 'Login' in df_display.columns else 0
             st.metric("Accounts with Positions", unique_accounts)
 
-        # Add refresh button
-        if st.button("🔄 Refresh Positions Data", key="refresh_positions"):
-            st.session_state.positions_data = None
-            st.session_state.positions_timestamp = 0
-            st.rerun()
+        # Note: Refresh is handled by background scanner
 
         # Pagination: 10 rows per page
         rows_per_page = 10
