@@ -205,6 +205,7 @@ class MT5Service:
                     'leverage': getattr(user, 'Leverage', None),
                     'balance': float(getattr(acc, 'Balance', 0.0)) if acc else 0.0,
                     'equity': float(getattr(acc, 'Equity', 0.0)) if acc else 0.0,
+                    'profit': float(getattr(acc, 'Profit', 0.0)) if acc else 0.0,
                 }
                 accounts.append(account_data)
             except Exception:
@@ -306,6 +307,7 @@ class MT5Service:
                                 'leverage': getattr(u, 'Leverage', None),
                                 'balance': float(getattr(acc, 'Balance', 0.0)) if acc else 0.0,
                                 'equity': float(getattr(acc, 'Equity', 0.0)) if acc else 0.0,
+                                'profit': float(getattr(acc, 'Profit', 0.0)) if acc else 0.0,
                             }
                             accounts.append(account_data)
                             if write_file:

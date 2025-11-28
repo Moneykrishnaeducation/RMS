@@ -3,6 +3,7 @@ import io
 import json
 import pandas as pd
 import streamlit as st
+import time
 
 from MT5Service import MT5Service
 from accounts import accounts_view
@@ -64,10 +65,114 @@ def dashboard_view(data):
     total_balance = data.get('balance', pd.Series(0)).astype(float).sum()
     total_equity = data.get('equity', pd.Series(0)).astype(float).sum()
 
-    k1, k2, k3 = st.columns(3)
-    k1.metric('Total accounts', total_accounts)
-    k2.metric('Total balance', f"{total_balance:,.2f}")
-    k3.metric('Total equity', f"{total_equity:,.2f}")
+    # Card HTML templates
+    card_css = """
+    <style>
+    .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+        border-radius: 10px;
+        margin: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        color: white;
+        text-align: center;
+        height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .metric-title {
+        margin: 0;
+        font-size: 16px;
+        font-weight: normal;
+        opacity: 0.9;
+    }
+    .metric-value {
+        margin: 10px 0 0 0;
+        font-size: 28px;
+        font-weight: bold;
+    }
+    </style>
+    """
+
+    card_accounts = f"""
+    <div class="metric-card">
+        <h3 class="metric-title">Total Accounts</h3>
+        <p class="metric-value">{total_accounts}</p>
+    </div>
+    """
+
+    card_balance = f"""
+    <div class="metric-card">
+        <h3 class="metric-title">Total Balance</h3>
+        <p class="metric-value">${total_balance:,.2f}</p>
+    </div>
+    """
+
+    card_equity = f"""
+    <div class="metric-card">
+        <h3 class="metric-title">Total Equity</h3>
+        <p class="metric-value">${total_equity:,.2f}</p>
+    </div>
+    """
+
+    # Display cards in columns
+    st.markdown(card_css, unsafe_allow_html=True)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(card_accounts, unsafe_allow_html=True)
+    with col2:
+        st.markdown(card_balance, unsafe_allow_html=True)
+    with col3:
+        st.markdown(card_equity, unsafe_allow_html=True)
+
+    # Top profit person for Real and Demo accounts
+    if 'profit' in data.columns and 'group' in data.columns and not data.empty:
+        # Separate real and demo accounts
+        real_accounts = data[~data['group'].str.contains('demo', case=False, na=False)]
+        demo_accounts = data[data['group'].str.contains('demo', case=False, na=False)]
+
+        # Top profit for Real accounts
+        if not real_accounts.empty:
+            top_real_row = real_accounts.loc[real_accounts['profit'].astype(float).idxmax()]
+            top_real_name = top_real_row.get('name', 'Unknown')
+            top_real_amount = float(top_real_row.get('profit', 0))
+            card_top_real = f"""
+            <div class="metric-card">
+                <h3 class="metric-title">Top Profit Person (Real)</h3>
+                <p class="metric-value">{top_real_name}<br/>${top_real_amount:,.2f}</p>
+            </div>
+            """
+
+        # Top profit for Demo accounts
+        if not demo_accounts.empty:
+            top_demo_row = demo_accounts.loc[demo_accounts['profit'].astype(float).idxmax()]
+            top_demo_name = top_demo_row.get('name', 'Unknown')
+            top_demo_amount = float(top_demo_row.get('profit', 0))
+            card_top_demo = f"""
+            <div class="metric-card">
+                <h3 class="metric-title">Top Profit Person (Demo)</h3>
+                <p class="metric-value">{top_demo_name}<br/>${top_demo_amount:,.2f}</p>
+            </div>
+            """
+
+        # Display additional cards in columns
+        col4, col5 = st.columns(2)
+        if not real_accounts.empty:
+            with col4:
+                st.markdown(card_top_real, unsafe_allow_html=True)
+        if not demo_accounts.empty:
+            with col5:
+                st.markdown(card_top_demo, unsafe_allow_html=True)
+
+    # Top accounts
+    st.subheader('Top accounts')
+    if 'equity' in data.columns:
+        top_eq = data.sort_values('equity', ascending=False).head(10)[['login', 'name', 'group', 'equity']]
+        st.table(top_eq)
+    if 'balance' in data.columns:
+        worst_bal = data.sort_values('balance', ascending=True).head(10)[['login', 'name', 'group', 'balance']]
+        st.table(worst_bal)
 
     # Groups breakdown
     st.subheader('Groups')
@@ -111,13 +216,43 @@ def positions_view(data):
         except Exception:
             continue
     if all_positions:
-        st.dataframe(pd.DataFrame(all_positions))
+        df = pd.DataFrame(all_positions)
+        # Select only the desired columns: ID, Symbol, Vol, Price, P/L
+        desired_columns = ['ID', 'Symbol', 'Vol', 'Price', 'P/L']
+        available_columns = [col for col in desired_columns if col in df.columns]
+        if available_columns:
+            df_display = df[available_columns]
+        else:
+            df_display = df
+
+        # Pagination: 10 rows per page
+        rows_per_page = 10
+        total_rows = len(df_display)
+        total_pages = (total_rows // rows_per_page) + (1 if total_rows % rows_per_page > 0 else 0)
+
+        if 'positions_page' not in st.session_state:
+            st.session_state.positions_page = 1
+
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col1:
+            if st.button('Previous', key='prev_page') and st.session_state.positions_page > 1:
+                st.session_state.positions_page -= 1
+        with col2:
+            page = st.selectbox('Page', options=list(range(1, total_pages + 1)), index=st.session_state.positions_page - 1, key='page_select')
+            st.session_state.positions_page = page
+        with col3:
+            if st.button('Next', key='next_page') and st.session_state.positions_page < total_pages:
+                st.session_state.positions_page += 1
+
+        start_row = (st.session_state.positions_page - 1) * rows_per_page
+        end_row = start_row + rows_per_page
+        st.dataframe(df_display.iloc[start_row:end_row])
     else:
         st.info('No open positions.')
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=5)
 def load_from_mt5(use_groups=True):
-    """Fetch accounts from MT5 using MT5Service. Cached for 5 minutes by default."""
+    """Fetch accounts from MT5 using MT5Service. Cached for 5 seconds by default."""
     svc = MT5Service()
     if use_groups:
         accounts = svc.list_accounts_by_groups()
@@ -132,6 +267,14 @@ def load_from_mt5(use_groups=True):
 def main():
     st.set_page_config(page_title='RMS - Accounts', layout='wide')
     st.title('RMS — Accounts Dashboard (Streamlit)')
+
+    # Auto refresh every 5 seconds
+    if 'last_refresh' not in st.session_state:
+        st.session_state.last_refresh = time.time()
+
+    if time.time() - st.session_state.last_refresh > 5:
+        st.session_state.last_refresh = time.time()
+        st.rerun()
 
     # Initialize session state for page
     if 'page' not in st.session_state:
