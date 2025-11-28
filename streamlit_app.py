@@ -250,6 +250,43 @@ def positions_view(data):
     else:
         st.info('No open positions.')
 
+def pl_view(data):
+    st.subheader('Profit/Loss Overview')
+
+    # Account type buttons
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Demo Account", key="demo_pl"):
+            st.session_state.pl_account_type = "demo"
+    with col2:
+        if st.button("Real Account", key="real_pl"):
+            st.session_state.pl_account_type = "real"
+
+    # Filter by account type if selected
+    if 'pl_account_type' in st.session_state:
+        if st.session_state.pl_account_type == "demo":
+            # Assuming demo accounts have 'demo' in group name, adjust logic as needed
+            data = data[data['group'].str.contains('demo', case=False, na=False)]
+        elif st.session_state.pl_account_type == "real":
+            # Assuming real accounts don't have 'demo' in group name
+            data = data[~data['group'].str.contains('demo', case=False, na=False)]
+
+    if 'profit' in data.columns:
+        # Create separate Profit and Loss columns
+        data_copy = data.copy()
+        data_copy['Profit'] = data_copy['profit'].apply(lambda x: x if x > 0 else 0)
+        data_copy['Loss'] = data_copy['profit'].apply(lambda x: x if x < 0 else 0)
+
+        # Sort by profit descending
+        pl_data = data_copy.sort_values('profit', ascending=False)[['login', 'name', 'group', 'Profit', 'Loss', 'balance', 'equity']]
+        st.dataframe(pl_data.head(50))
+
+        # P/L distribution chart
+        st.subheader('P/L Distribution')
+        st.bar_chart(data['profit'].head(50))
+    else:
+        st.info('No profit/loss data available.')
+
 @st.cache_data(ttl=5)
 def load_from_mt5(use_groups=True):
     """Fetch accounts from MT5 using MT5Service. Cached for 5 seconds by default."""
@@ -292,6 +329,8 @@ def main():
         st.session_state.page = "reports"
     if st.sidebar.button("📈 Open Positions", key="nav_positions"):
         st.session_state.page = "positions"
+    if st.sidebar.button("💰 P/L", key="nav_pl"):
+        st.session_state.page = "pl"
 
     st.sidebar.header('Data source')
     st.sidebar.write('Loading accounts directly from MT5 Manager using `.env` credentials')
@@ -341,6 +380,9 @@ def main():
             leverage_filter = st.sidebar.multiselect('Filter leverages', leverages_list, max_selections=5, key='leverage_filter')
         min_balance = st.sidebar.number_input('Min balance', value=float(data['balance'].min() if 'balance' in data.columns else 0.0), key='min_balance')
         max_balance = st.sidebar.number_input('Max balance', value=float(data['balance'].max() if 'balance' in data.columns else 0.0), key='max_balance')
+        if 'profit' in data.columns:
+            min_pl = st.sidebar.number_input('Min P/L', value=float(data['profit'].min() if 'profit' in data.columns else 0.0), key='min_pl')
+            max_pl = st.sidebar.number_input('Max P/L', value=float(data['profit'].max() if 'profit' in data.columns else 0.0), key='max_pl')
 
     # Display the selected page
     if st.session_state.page == 'dashboard':
@@ -353,6 +395,8 @@ def main():
         reports_view(data)
     elif st.session_state.page == 'positions':
         positions_view(data)
+    elif st.session_state.page == 'pl':
+        pl_view(data)
 
 
 if __name__ == '__main__':
