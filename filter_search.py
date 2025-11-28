@@ -53,7 +53,11 @@ def filter_search_view(data):
     col1, col2, col3 = st.columns([1, 1, 1])
 
     with col1:
-        login_filter = st.text_input("Search by Login", placeholder="Enter login")
+        # Create dropdown list for login (unique values + "All")
+        login_options = ["All"] + sorted(df['login'].dropna().unique().tolist())
+
+        # Dropdown selectbox
+        login_filter = st.selectbox("Filter by Login", login_options)
 
     with col2:
         name_options = ["All"] + sorted(df['name'].dropna().unique().tolist())
@@ -63,9 +67,10 @@ def filter_search_view(data):
         group_options = ["All"] + sorted(df['group'].dropna().unique().tolist())
         base_filter = st.selectbox("Filter by Base Symbol", group_options)
 
-    # ---------------- APPLY FILTERS ----------------
-    if login_filter:
-        df = df[df['login'].astype(str).str.contains(login_filter, case=False)]
+    # ---------------- APPLY FILTERS ---------------
+    filtered_df = df.copy()
+    if login_filter != "All":
+        filtered_df = filtered_df[ filtered_df['login'] == login_filter ]
 
     if name_filter != "All":
         df = df[df['name'] == name_filter]
