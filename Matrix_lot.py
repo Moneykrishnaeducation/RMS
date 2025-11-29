@@ -1,10 +1,10 @@
 import pandas as pd
 import streamlit as st
-from Services import MT5ManagerActions
+from MT5Service import MT5Service
 
 @st.cache_data(ttl=5)      # 🔥 Auto-cache for speed (reloads every 5 sec)
 def get_login_symbol_matrix():
-    svc = MT5ManagerActions()
+    svc = MT5Service()
 
     accounts = svc.list_mt5_accounts()
     if not accounts:

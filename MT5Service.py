@@ -338,6 +338,87 @@ class MT5Service:
                 results.append(acc)
         return results
 
+    def list_deals_by_login(self, login_id, from_date=None, to_date=None):
+        """Return list of closed deals for the given login id."""
+        mgr = self.connect()
+        try:
+            from datetime import datetime, timedelta
+            if to_date is None:
+                to_date = datetime.now()
+            if from_date is None:
+                from_date = to_date - timedelta(days=365)
+
+            # Validate that login_id is numeric before making MT5 call
+            try:
+                numeric_login_id = int(login_id)
+            except (ValueError, TypeError):
+                return []
+
+            deals = mgr.DealRequest(numeric_login_id, from_date, to_date)
+
+            # Defensive: DealRequest can return False, None, empty list, or a list of deals
+            if deals is False or deals is None:
+                return []
+            if isinstance(deals, bool):
+                return []
+            if not isinstance(deals, (list, tuple)):
+                return []
+            if not deals:
+                return []
+
+            closed_deals = []
+            for d in deals:
+                action = getattr(d, 'Action', None)
+                entry = getattr(d, 'Entry', None)
+                symbol = getattr(d, 'Symbol', None)
+                volume_closed = getattr(d, 'VolumeClosed', 0)
+                # Filter for closed deals
+                if entry == 1 and symbol and str(symbol).strip() != '' and volume_closed and float(volume_closed) > 0 and action in (0, 1):
+                    closed_deals.append({
+                        'Symbol': symbol,
+                        'Profit': getattr(d, 'Profit', 0.0),
+                    })
+            return closed_deals
+        except Exception:
+            return []
+
+    def list_orders_by_login(self, login_id):
+        """Return list of pending orders for the given login id."""
+        mgr = self.connect()
+        try:
+            # Validate that login_id is numeric before making MT5 call
+            try:
+                numeric_login_id = int(login_id)
+            except (ValueError, TypeError):
+                return []
+
+            orders = mgr.OrderRequest(numeric_login_id)
+
+            # Defensive: OrderRequest can return False, None, empty list, or a list of orders
+            if orders is False or orders is None:
+                return []
+            if isinstance(orders, bool):
+                return []
+            if not isinstance(orders, (list, tuple)):
+                return []
+            if not orders:
+                return []
+
+            pending_orders = []
+            for o in orders:
+                symbol = getattr(o, 'Symbol', None)
+                volume = getattr(o, 'Volume', 0)
+                order_type = getattr(o, 'Type', None)  # 0 for BUY, 1 for SELL
+                if symbol and volume:
+                    pending_orders.append({
+                        'Symbol': symbol,
+                        'Volume': volume,
+                        'Type': order_type,
+                    })
+            return pending_orders
+        except Exception:
+            return []
+
 
 if __name__ == '__main__':
     import argparse

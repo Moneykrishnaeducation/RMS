@@ -1,7 +1,7 @@
 # pnl_matrix.py
 import pandas as pd
 import streamlit as st
-from Services import MT5ManagerActions
+from MT5Service import MT5Service
 
 @st.cache_data(ttl=5)
 def get_login_symbol_pnl_matrix(data):
@@ -9,7 +9,7 @@ def get_login_symbol_pnl_matrix(data):
     Returns a matrix of total USD P&L per Login vs Symbol.
     P&L is computed from closed trades.
     """
-    svc = MT5ManagerActions()
+    svc = MT5Service()
 
     if data.empty:
         return pd.DataFrame()
