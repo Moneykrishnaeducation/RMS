@@ -31,6 +31,9 @@ class MT5Service:
     RMS for listing accounts, reading account details and positions, and fetching groups.
     """
 
+    _shared_manager = None
+    _shared_lock = threading.Lock()
+
     def __init__(self, host=None, port=None, login=None, password=None, pump_mode=1, timeout=120000):
         # load defaults from .env if not provided
         env = _read_env()
@@ -67,10 +70,11 @@ class MT5Service:
 
     def connect(self):
         """Connect to MT5 Manager. Raises Exception on failure."""
-        with self._lock:
-            if self.manager and getattr(self.manager, 'connected', False):
-                return self.manager
+        with MT5Service._shared_lock:
+            if MT5Service._shared_manager and getattr(MT5Service._shared_manager, 'connected', False):
+                return MT5Service._shared_manager
             self._init_manager()
+            MT5Service._shared_manager = self.manager
             # Choose pump mode: prefer library constant if available, else use provided numeric
             pump = self.pump_mode
             try:
@@ -82,23 +86,23 @@ class MT5Service:
                 # fallback to numeric pump_mode already set
                 pump = self.pump_mode
 
-            if not self.manager.Connect(self.address, int(self.login), str(self.password), pump, int(self.timeout)):
+            if not MT5Service._shared_manager.Connect(self.address, int(self.login), str(self.password), pump, int(self.timeout)):
                 # try one more time with numeric fallback 1
                 last = MT5Manager.LastError()
                 try:
                     if pump != 1:
-                        if self.manager.Connect(self.address, int(self.login), str(self.password), 1, int(self.timeout)):
-                            self.manager.connected = True
-                            return self.manager
+                        if MT5Service._shared_manager.Connect(self.address, int(self.login), str(self.password), 1, int(self.timeout)):
+                            MT5Service._shared_manager.connected = True
+                            return MT5Service._shared_manager
                 except Exception:
                     pass
                 raise Exception(f"Failed to connect to MT5 Manager: {last}")
             # mark connected
             try:
-                self.manager.connected = True
+                MT5Service._shared_manager.connected = True
             except Exception:
                 pass
-            return self.manager
+            return MT5Service._shared_manager
 
     def close(self):
         try:
@@ -321,6 +325,30 @@ class MT5Service:
                 write_file.close()
 
         return accounts
+
+    def list_deals_by_login(self, login_id):
+        """Return list of closed deals for the given login id."""
+        mgr = self.connect()
+        try:
+            deals = mgr.DealGet(int(login_id))
+            if not deals:
+                return []
+            out = []
+            for d in deals:
+                out.append({
+                    'Deal': getattr(d, 'Deal', None),
+                    'Login': getattr(d, 'Login', None),
+                    'Symbol': getattr(d, 'Symbol', None),
+                    'Profit': getattr(d, 'Profit', None),
+                    'Volume': round(getattr(d, 'Volume', 0) / 10000, 2),
+                    'Price': getattr(d, 'Price', None),
+                    'Time': getattr(d, 'Time', None),
+                    'Type': getattr(d, 'Action', None),
+                    'Entry': getattr(d, 'Entry', None),
+                })
+            return out
+        except Exception:
+            return []
 
     def search_accounts_by_name_email(self, name=None, email=None):
         """Search accounts by name or email. Returns list of matching accounts."""
