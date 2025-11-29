@@ -11,7 +11,7 @@ from accounts import accounts_view
 from profile import profile_view
 from filter_search import filter_search_view      # ⭐ NEW IMPORT
 from openposition import positions_details_view   # ⭐ NEW IMPORT
-from Matrix_lot import get_login_symbol_matrix        # ⭐ NEW IMPORT
+from Matrix_lot import get_login_symbol_matrix,get_detailed_position_table,display_position_table          # ⭐ NEW IMPORT
 from XAUUSD import get_xauusd_data
 from groupdashboard import groupdashboard_view
 
