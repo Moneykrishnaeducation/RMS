@@ -1,0 +1,2 @@
+- [ ] Update display_login_symbol_pnl_pivot function to log first 10 rows instead of 2
+- [ ] Update display_login_symbol_profit_pivot_table function to log first 10 rows instead of 2

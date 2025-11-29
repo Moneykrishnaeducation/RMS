@@ -5,13 +5,13 @@ import pandas as pd
 import streamlit as st
 import time
 import threading
-from pnl_matrix import get_login_symbol_pnl_matrix
+from pnl_matrix import get_login_symbol_pnl_matrix, get_login_symbol_profit_matrix, display_login_symbol_profit_pivot_table
 from MT5Service import MT5Service
 from accounts import accounts_view
 from profile import profile_view
 from filter_search import filter_search_view      # ⭐ NEW IMPORT
 from openposition import positions_details_view   # ⭐ NEW IMPORT
-from Matrix_lot import get_login_symbol_matrix,get_detailed_position_table,display_position_table          # ⭐ NEW IMPORT
+from Matrix_lot import get_login_symbol_matrix,get_detailed_position_table,display_position_table,display_login_symbol_pivot_table          # ⭐ NEW IMPORT
 from XAUUSD import get_xauusd_data
 from groupdashboard import groupdashboard_view
 
@@ -597,10 +597,26 @@ def background_position_scanner():
 def matrix_lot_view(data):
     st.subheader('Login vs Symbol Matrix - Net Lot')
     
-    # Create tabs for two views
-    tab1, tab2 = st.tabs(["📋 Detailed Position Table", "🔢 Matrix View"])
+    # Create tabs for four views
+    tab1, tab2, tab3, tab4 = st.tabs(["🎯 Pivot Matrix (Lot)", "💰 Profit/Loss Matrix", "📋 Detailed Position Table", "🔢 Classic Matrix"])
     
     with tab1:
+        st.write("Login × Symbol pivot table showing net lots at intersections.")
+        try:
+            with st.spinner('Loading pivot table...'):
+                display_login_symbol_pivot_table(data)
+        except Exception as e:
+            st.error(f'Failed to display pivot table: {e}')
+    
+    with tab2:
+        st.write("Login × Symbol pivot table showing profit/loss (USD P&L) from open positions.")
+        try:
+            with st.spinner('Loading profit/loss matrix...'):
+                display_login_symbol_profit_pivot_table(data, st.session_state.positions_cache)
+        except Exception as e:
+            st.error(f'Failed to display profit/loss matrix: {e}')
+    
+    with tab3:
         st.write("This view shows individual positions organized by Symbol and Login.")
         try:
             with st.spinner('Loading positions...'):
@@ -608,7 +624,7 @@ def matrix_lot_view(data):
         except Exception as e:
             st.error(f'Failed to display positions: {e}')
     
-    with tab2:
+    with tab4:
         st.write("This matrix shows the net lot (buy volume - sell volume) for each login across specified symbols.")
         if data.empty:
             st.info('No account data available.')
@@ -633,7 +649,7 @@ def matrix_lot_view(data):
 
 def usd_matrix_view(data):
     st.subheader('Login vs Symbol Matrix - USD P&L')
-    st.write("This matrix shows the total USD P&L for each login across specified symbols from closed trades.")
+    st.write("This matrix shows the total USD P&L for each login across specified symbols from open positions.")
 
     if data.empty:
         st.info('No account data available.')
@@ -641,22 +657,37 @@ def usd_matrix_view(data):
 
     try:
         with st.spinner('Generating USD P&L matrix...'):
-            matrix_df = get_login_symbol_pnl_matrix(data)
+            # Prepare data dictionary with accounts_df and positions_cache
+            matrix_data = {
+                'accounts_df': data,
+                'positions_cache': st.session_state.positions_cache
+            }
+            matrix_df = get_login_symbol_pnl_matrix(matrix_data)
 
         if matrix_df.empty:
-            st.info('No closed trades found for the accounts.')
+            st.info('No open positions found for the accounts.')
         else:
-            st.dataframe(matrix_df)
+            # Display metrics
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Logins", len(matrix_df) - (1 if "All Login" in matrix_df.index else 0))
+            with col2:
+                st.metric("Total Symbols", len(matrix_df.columns))
+            with col3:
+                total_pnl = matrix_df.loc["All Login"].sum() if "All Login" in matrix_df.index else matrix_df.sum().sum()
+                st.metric("Total USD P&L (All Login)", f"${total_pnl:,.2f}")
+            
+            st.dataframe(matrix_df, use_container_width=True, height=500)
 
             # Export to CSV
             buf = io.StringIO()
             matrix_df.to_csv(buf, index=False)
-            st.download_button('Download Matrix CSV', data=buf.getvalue(), file_name='usd_pnl_matrix.csv', mime='text/csv')
+            st.download_button('📥 Download Matrix CSV', data=buf.getvalue(), file_name='usd_pnl_matrix.csv', mime='text/csv')
 
     except Exception as e:
         st.error(f'Failed to generate matrix: {e}')
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=60)
 def load_from_mt5(use_groups=True):
     """Fetch accounts from MT5 using MT5Service. Cached for 5 seconds by default."""
     svc = MT5Service()
@@ -705,8 +736,8 @@ def main():
         st.session_state.page = "groups"
     if st.sidebar.button("📊 Matrix Lot", key="nav_matrix_lot"):
         st.session_state.page = "matrix_lot"
-    if st.sidebar.button("📉 View USD P&L Matrix", key=" nav_usd_matrix"):
-        st.session_state.page = " usd_matrix"
+    if st.sidebar.button("📉 View USD P&L Matrix", key="nav_usd_matrix_sidebar"):
+        st.session_state.page = "usd_matrix"
     if st.sidebar.button("🪙 XAUUSD", key="nav_XAUUSD_top"):
         st.session_state.page = "XAUUSD"
     if st.sidebar.button("📊 Group Dashboard"):
@@ -807,7 +838,7 @@ def main():
     elif st.session_state.page == 'matrix_lot':
         matrix_lot_view(data)
     elif st.session_state.page == 'usd_matrix':
-        get_login_symbol_pnl_matrix(data)
+        usd_matrix_view(data)
     elif st.session_state.page == 'XAUUSD':
         get_xauusd_data()
     elif st.session_state.page == "groupdashboard":
