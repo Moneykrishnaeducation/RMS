@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-def accounts_view(data):
+def accounts_view(data,accounts_cache):
     # Account type buttons
     col1, col2 = st.columns(2)
     with col1:
