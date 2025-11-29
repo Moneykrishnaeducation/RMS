@@ -48,15 +48,11 @@ def filter_search_view(data):
             df = df[df["group"].apply(is_real)]
         else:
             df = df[df["group"].apply(is_demo)]
-
     # ---------------- SEARCH FILTERS ----------------
     col1, col2, col3 = st.columns([1, 1, 1])
 
     with col1:
-        # Create dropdown list for login (unique values + "All")
         login_options = ["All"] + sorted(df['login'].dropna().unique().tolist())
-
-        # Dropdown selectbox
         login_filter = st.selectbox("Filter by Login", login_options)
 
     with col2:
@@ -69,36 +65,45 @@ def filter_search_view(data):
 
     # ---------------- APPLY FILTERS ---------------
     filtered_df = df.copy()
-    
+
     if login_filter != "All":
         filtered_df = filtered_df[ filtered_df['login'] == login_filter ]
 
     if name_filter != "All":
-        df = df[df['name'] == name_filter]
+        filtered_df = filtered_df[ filtered_df['name'] == name_filter ]
 
     if base_filter != "All":
-        df = df[df['group'] == base_filter]
+        filtered_df = filtered_df[ filtered_df['group'] == base_filter ]
 
     # ---------------- APPLY SIDEBAR FILTERS ----------------
     if st.session_state.get("group_filter"):
-        df = df[df['group'].isin(st.session_state.group_filter)]
+        filtered_df = filtered_df[ filtered_df['group'].isin(st.session_state.group_filter) ]
 
     if st.session_state.get("name_filter"):
-        df = df[df['name'].isin(st.session_state.name_filter)]
+        filtered_df = filtered_df[ filtered_df['name'].isin(st.session_state.name_filter) ]
 
     if st.session_state.get("email_filter"):
-        df = df[df['email'].isin(st.session_state.email_filter)]
+        filtered_df = filtered_df[ filtered_df['email'].isin(st.session_state.email_filter) ]
 
     if st.session_state.get("leverage_filter"):
-        df = df[df['leverage'].isin(st.session_state.leverage_filter)]
+        filtered_df = filtered_df[ filtered_df['leverage'].isin(st.session_state.leverage_filter) ]
 
     if st.session_state.get("login_search"):
-        df = df[df['login'].astype(str).str.contains(st.session_state.login_search)]
+        filtered_df = filtered_df[ filtered_df['login'].astype(str).str.contains(st.session_state.login_search) ]
 
-    if 'balance' in df.columns:
-        min_bal = st.session_state.get('min_balance', float(df['balance'].min()))
-        max_bal = st.session_state.get('max_balance', float(df['balance'].max()))
-        df = df[(df['balance'].astype(float) >= min_bal) & (df['balance'].astype(float) <= max_bal)]
+    if 'balance' in filtered_df.columns:
+        min_bal = st.session_state.get('min_balance', float(filtered_df['balance'].min()))
+        max_bal = st.session_state.get('max_balance', float(filtered_df['balance'].max()))
+        filtered_df = filtered_df[
+            (filtered_df['balance'].astype(float) >= min_bal) &
+            (filtered_df['balance'].astype(float) <= max_bal)
+        ]
+
+    # ---------------- SHOW FILTERED TABLE ONLY ----------------
+    st.subheader(f"{account_type} Matching Filters")
+    st.write(f"**{len(filtered_df)} accounts found**")
+
+    st.dataframe(filtered_df, use_container_width=True)
 
     # ---------------- DISPLAY FULL REAL ACCOUNT LIST ----------------
     st.subheader(f"{account_type} Matching Filters")
