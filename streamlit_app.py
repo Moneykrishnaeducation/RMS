@@ -5,13 +5,13 @@ import pandas as pd
 import streamlit as st
 import time
 import threading
-
+from pnl_matrix import get_login_symbol_pnl_matrix
 from MT5Service import MT5Service
 from accounts import accounts_view
 from profile import profile_view
 from filter_search import filter_search_view      # ⭐ NEW IMPORT
 from openposition import positions_details_view   # ⭐ NEW IMPORT
-from Matrix_lot import get_net_lot_matrix        # ⭐ NEW IMPORT
+from Matrix_lot import get_login_symbol_matrix        # ⭐ NEW IMPORT
 
 
 # Initialize session state for caches (persistent across reruns)
@@ -71,7 +71,7 @@ nav_css = """
 def render_nav():
     st.markdown(nav_css, unsafe_allow_html=True)
     st.markdown('<div class="nav-container">', unsafe_allow_html=True)
-    col1, col2, col3, col4, col5 = st.columns(5)
+    col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
     with col1:
         if st.button("🏠 Dashboard", key="nav_dashboard"):
             st.session_state.page = "dashboard"
@@ -87,6 +87,15 @@ def render_nav():
     with col5:
         if st.button("👥 Groups", key="nav_groups_top"):
             st.session_state.page = "groups"
+    with col6:
+        if st.button("📊 Matrix Lot", key="nav_matrix_lot"):
+            st.session_state.page = "matrix_lot"
+    with col7:
+        if st.button("📉 View USD P&L Matrix", key="nav_usd_matrix"):
+            st.session_state.page = "usd_matrix"
+    with col8:
+        if st.button("📉XAUUSD", key="nav_xauusd"):
+            st.session_state.page = "xauusd"
     st.markdown('</div>', unsafe_allow_html=True)
 
 def dashboard_view(data):
@@ -529,14 +538,14 @@ def background_position_scanner():
 def matrix_lot_view(data):
     st.subheader('Login vs Symbol Matrix - Net Lot')
     st.write("This matrix shows the net lot (buy volume - sell volume) for each login across specified symbols.")
-        
+
     if data.empty:
         st.info('No account data available.')
         return
 
     try:
         with st.spinner('Generating net lot matrix...'):
-            matrix_df = get_net_lot_matrix(data)
+            matrix_df = get_login_symbol_matrix(data)
 
         if matrix_df.empty:
             st.info('No open positions found for the accounts.')
@@ -547,6 +556,31 @@ def matrix_lot_view(data):
             buf = io.StringIO()
             matrix_df.to_csv(buf, index=False)
             st.download_button('Download Matrix CSV', data=buf.getvalue(), file_name='net_lot_matrix.csv', mime='text/csv')
+
+    except Exception as e:
+        st.error(f'Failed to generate matrix: {e}')
+
+def usd_matrix_view(data):
+    st.subheader('Login vs Symbol Matrix - USD P&L')
+    st.write("This matrix shows the total USD P&L for each login across specified symbols from closed trades.")
+
+    if data.empty:
+        st.info('No account data available.')
+        return
+
+    try:
+        with st.spinner('Generating USD P&L matrix...'):
+            matrix_df = get_login_symbol_pnl_matrix(data)
+
+        if matrix_df.empty:
+            st.info('No closed trades found for the accounts.')
+        else:
+            st.dataframe(matrix_df)
+
+            # Export to CSV
+            buf = io.StringIO()
+            matrix_df.to_csv(buf, index=False)
+            st.download_button('Download Matrix CSV', data=buf.getvalue(), file_name='usd_pnl_matrix.csv', mime='text/csv')
 
     except Exception as e:
         st.error(f'Failed to generate matrix: {e}')
@@ -609,7 +643,10 @@ def main():
         st.session_state.page = "groups"
     if st.sidebar.button("📊 Matrix Lot", key="nav_matrix_lot"):
         st.session_state.page = "matrix_lot"
-
+    if st.sidebar.button("📉 View USD P&L Matrix", key=" nav_usd_matrix"):
+        st.session_state.page = " usd_matrix"
+    if st.sidebar.button("👥 XAUUSD", key="nav_XAUUSD_top"):
+        st.session_state.page = "XAUUSD"
 
     st.sidebar.header('Data source')
     st.sidebar.write('Loading accounts directly from MT5 Manager using `.env` credentials')
@@ -704,6 +741,9 @@ def main():
         groups_view(data)
     elif st.session_state.page == 'matrix_lot':
         matrix_lot_view(data)
-
+    elif st.session_state.page == 'usd_matrix':
+        get_login_symbol_pnl_matrix(data)
+    elif st.session_state.page == 'XAUUSD':
+        get_xauusd_data()
 if __name__ == '__main__':
     main()

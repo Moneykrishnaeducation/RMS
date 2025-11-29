@@ -1,45 +1,48 @@
 import pandas as pd
-from MT5Service import MT5Service
+import streamlit as st
+from Services import MT5ManagerActions
 
-def get_net_lot_matrix(accounts_df):
-    """
-    Generate a matrix of net lots for each login vs specified symbols.
-    Net lot is calculated as sum of buy volumes minus sum of sell volumes for each symbol.
-    """
-    svc = MT5Service()
-    all_net_positions = []
-    symbols = ['XAUUSD', 'EURUSD', 'AUDUSD', 'BTCUSD', 'GBPJPY', 'GBPUSD', 'NGAS.FT', 'Tesla', 'USDCAD', 'USDCHF', 'USDJPY', 'USOil', 'XAGUSD']
+@st.cache_data(ttl=5)      # 🔥 Auto-cache for speed (reloads every 5 sec)
+def get_login_symbol_matrix():
+    svc = MT5ManagerActions()
 
-    for login in accounts_df['login'].unique():
-        try:
-            positions = svc.get_open_positions(login)
-            for p in positions:
-                symbol = p.get('symbol')
-                if symbol not in symbols:
-                    continue  # only include specified symbols
-                vol = p.get('volume', 0)
-                typ = p.get('type')
-                net_vol = vol if typ == 'Buy' else -vol
-                all_net_positions.append({'login': login, 'symbol': symbol, 'net_vol': net_vol})
-        except Exception as e:
-            continue
+    accounts = svc.list_mt5_accounts()
+    if not accounts:
+        return pd.DataFrame()
 
-    if not all_net_positions:
-        # return empty df with columns
-        df = pd.DataFrame(columns=['Login'] + symbols)
-        return df
+    matrix = {}
+    all_symbols = set()
 
-    df = pd.DataFrame(all_net_positions)
-    # pivot to create matrix
-    pivot_df = df.pivot_table(index='login', columns='symbol', values='net_vol', aggfunc='sum', fill_value=0)
-    # reset index
-    pivot_df.reset_index(inplace=True)
-    pivot_df.rename(columns={'login': 'Login'}, inplace=True)
-    # ensure all symbols are present, even if no data
-    for sym in symbols:
-        if sym not in pivot_df.columns:
-            pivot_df[sym] = 0
-    # reorder columns
-    cols = ['Login'] + symbols
-    pivot_df = pivot_df[cols]
-    return pivot_df
+    for acc in accounts:
+        login = acc["Login"]
+        orders = svc.list_orders_by_login(login)
+
+        symbol_lots = {}
+
+        for o in orders or []:
+            symbol = o["Symbol"]
+            volume = float(o["Volume"])
+            order_type = o["Type"]
+
+            if symbol not in symbol_lots:
+                symbol_lots[symbol] = 0.0
+
+            # BUY 0 → Add, SELL 1 → Subtract
+            symbol_lots[symbol] += volume if order_type == 0 else -volume
+            all_symbols.add(symbol)
+
+        matrix[login] = symbol_lots
+
+    # Convert into DataFrame
+    df = pd.DataFrame.from_dict(matrix, orient="index").fillna(0.0)
+
+    # Add "All Login" Row
+    df.loc["All Login"] = df.sum()
+
+    # Sort columns alphabetically
+    df = df[sorted(df.columns)]
+
+    # Move All Login to top
+    df = df.reindex(["All Login"] + [i for i in df.index if i != "All Login"])
+
+    return df
