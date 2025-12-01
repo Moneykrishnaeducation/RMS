@@ -168,7 +168,7 @@ def dashboard_view(data):
 
     card_profit = f"""
     <div class="metric-card">
-        <h3 class="metric-title">Total Profit</h3>
+        <h3 class="metric-title">Total P/L</h3>
         <p class="metric-value">${total_profit:,.2f}</p>
     </div>
     """
@@ -304,7 +304,7 @@ def positions_view(data):
 
         df = pd.DataFrame(all_positions)
         # Select only the desired columns: Login, ID, Symbol, Vol, Price, P/L, Type, Date, Name
-        desired_columns = ['Login', 'ID', 'Symbol', 'Vol', 'Price', 'P/L', 'Type', 'Date', 'Name']
+        desired_columns = ['Login', 'ID', 'Symbol', 'Vol', 'Price', 'P/L', 'Type', 'Name']
         if not df.empty:
             available_columns = [col for col in desired_columns if col in df.columns]
             if available_columns:
@@ -476,7 +476,7 @@ def pl_view(data):
         data_copy['Loss'] = data_copy['profit'].apply(lambda x: x if x < 0 else 0)
 
         # Sort by profit descending
-        pl_data = data_copy.sort_values('profit', ascending=False)[['login', 'name', 'group', 'Profit', 'Loss', 'balance', 'equity']]
+        pl_data = data_copy.sort_values('profit', ascending=False)[['login', 'name', 'group', 'Profit', 'balance', 'equity']]
         st.dataframe(pl_data.head(50))
 
         # P/L distribution chart
@@ -739,7 +739,7 @@ def main():
     if st.sidebar.button("📉 View USD P&L Matrix", key="nav_usd_matrix_sidebar"):
         st.session_state.page = "usd_matrix"
     if st.sidebar.button("🪙 XAUUSD", key="nav_XAUUSD_top"):
-        st.session_state.page = "XAUUSD"
+        st.session_state.page = "xauusd"
     if st.sidebar.button("📊 Group Dashboard"):
         st.session_state.page = "groupdashboard"
 
@@ -839,7 +839,7 @@ def main():
         matrix_lot_view(data)
     elif st.session_state.page == 'usd_matrix':
         usd_matrix_view(data)
-    elif st.session_state.page == 'XAUUSD':
+    elif st.session_state.page == 'xauusd':
         get_xauusd_data()
     elif st.session_state.page == "groupdashboard":
         groupdashboard_view(data)
