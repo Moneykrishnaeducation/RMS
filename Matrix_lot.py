@@ -12,9 +12,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-__all__ = ['get_login_symbol_matrix', 'get_detailed_position_table', 'display_position_table', 'display_login_symbol_pivot_table', 'get_login_symbol_profit_matrix', 'display_login_symbol_profit_pivot_table']
+__all__ = ['get_login_symbol_matrix', 'get_detailed_position_table', 'display_position_table', 'display_login_symbol_pivot_table']
 
-@st.cache_data(ttl=5)      # 🔥 Auto-cache for speed (reloads every 5 sec)
+@st.cache_data(ttl=1)      # 🔥 Auto-cache for speed (reloads every 5 sec)
 def get_login_symbol_matrix(accounts_df=None, positions_cache=None):
     svc = MT5Service()
 
@@ -136,6 +136,7 @@ def get_login_symbol_matrix(accounts_df=None, positions_cache=None):
     return df
 
 
+@st.cache_data(ttl=5)  # 🔥 Auto-cache for speed (reloads every 5 sec)
 def get_detailed_position_table(accounts_df=None, positions_cache=None):
     """
     Get detailed position table in Symbol × Login format with volumes.
@@ -353,6 +354,18 @@ def display_position_table(accounts_df=None, positions_cache=None, show_details=
     """
     logger.info("🎨 DISPLAYING POSITION TABLE IN STREAMLIT")
     st.subheader('📊 Login vs Symbol - Position Details')
+    
+    # Auto-refresh every 5 seconds
+    st.markdown("""
+        <script>
+        function autoRefreshTable() {
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        }
+        autoRefreshTable();
+        </script>
+    """, unsafe_allow_html=True)
     
     try:
         logger.info("📥 Fetching detailed position table...")

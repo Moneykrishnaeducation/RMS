@@ -12,6 +12,8 @@ from profile import profile_view
 from filter_search import filter_search_view      # ⭐ NEW IMPORT
 from openposition import positions_details_view   # ⭐ NEW IMPORT
 from Matrix_lot import get_login_symbol_matrix,get_detailed_position_table,display_position_table,display_login_symbol_pivot_table          # ⭐ NEW IMPORT
+from net_lot import display_net_lot_view          # ⭐ NEW IMPORT
+from trend import display_trend_view              # ⭐ NEW IMPORT
 from XAUUSD import get_xauusd_data
 from groupdashboard import groupdashboard_view
 
@@ -73,7 +75,7 @@ nav_css = """
 def render_nav():
     st.markdown(nav_css, unsafe_allow_html=True)
     st.markdown('<div class="nav-container">', unsafe_allow_html=True)
-    col1, col2, col3, col4, col5, col6, col7, col8,col9 = st.columns(8)
+    col1, col2, col3, col4, col5, col6, col7, col8, col9, col10 = st.columns(10)
     with col1:
         if st.button("🏠 Dashboard", key="nav_dashboard"):
             st.session_state.page = "dashboard"
@@ -89,7 +91,7 @@ def render_nav():
     with col5:
         if st.button("👥 Groups", key="nav_groups_top"):
             st.session_state.page = "groups"
-    
+
     with col6:
         if st.button("📊 Matrix Lot", key="nav_matrix_lot"):
             st.session_state.page = "matrix_lot"
@@ -102,6 +104,9 @@ def render_nav():
     with col9:
         if st.button("📊 Group Dashboard", key="nav_group_dashboard_top"):
             st.session_state.page = "groupdashboard"
+    with col10:
+        if st.button("📊 Net Lot", key="nav_net_lot"):
+            st.session_state.page = "net_lot"
     
 
 
@@ -760,6 +765,8 @@ def main():
         st.session_state.page = "xauusd"
     if st.sidebar.button("📊 Group Dashboard"):
         st.session_state.page = "groupdashboard"
+    if st.sidebar.button("📊 Net Lot"):
+        st.session_state.page = "net_lot"
 
 
     st.sidebar.header('Data source')
@@ -861,6 +868,8 @@ def main():
         get_xauusd_data()
     elif st.session_state.page == "groupdashboard":
         groupdashboard_view()
+    elif st.session_state.page == "net_lot":
+        display_net_lot_view(data)
 
 
 if __name__ == '__main__':
