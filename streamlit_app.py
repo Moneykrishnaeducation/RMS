@@ -842,7 +842,7 @@ def main():
     elif st.session_state.page == 'xauusd':
         get_xauusd_data()
     elif st.session_state.page == "groupdashboard":
-        groupdashboard_view(data)
+        groupdashboard_view()
 
 
 if __name__ == '__main__':
