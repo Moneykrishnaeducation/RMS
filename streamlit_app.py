@@ -757,6 +757,10 @@ def main():
         st.session_state.page = "filter_search"
     if st.sidebar.button("👥 Groups", key="nav_groups"):
         st.session_state.page = "groups"
+    if st.sidebar.button("📊 Net Lot"):
+        st.session_state.page = "net_lot"
+    if st.sidebar.button("📈 Trend"):
+        st.session_state.page = "trend"
     if st.sidebar.button("📊 Matrix Lot", key="nav_matrix_lot"):
         st.session_state.page = "matrix_lot"
     if st.sidebar.button("📉 View USD P&L Matrix", key="nav_usd_matrix_sidebar"):
@@ -765,10 +769,6 @@ def main():
         st.session_state.page = "xauusd"
     if st.sidebar.button("📊 Group Dashboard"):
         st.session_state.page = "groupdashboard"
-    if st.sidebar.button("📊 Net Lot"):
-        st.session_state.page = "net_lot"
-    if st.sidebar.button("📈 Trend"):
-        st.session_state.page = "trend"
 
 
     st.sidebar.header('Data source')
@@ -869,7 +869,7 @@ def main():
     elif st.session_state.page == 'xauusd':
         get_xauusd_data()
     elif st.session_state.page == "groupdashboard":
-        groupdashboard_view()
+        groupdashboard_view(data)
     elif st.session_state.page == "net_lot":
         display_net_lot_view(data)
     elif st.session_state.page == "trend":
