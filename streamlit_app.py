@@ -753,10 +753,12 @@ def main():
         st.session_state.page = "positions"
     if st.sidebar.button("💰 P/L", key="nav_pl"):
         st.session_state.page = "pl"
-    if st.sidebar.button("🔍 Filter Search"):   # ⭐ NEW SIDEBAR BUTTON
-        st.session_state.page = "filter_search"
     if st.sidebar.button("👥 Groups", key="nav_groups"):
         st.session_state.page = "groups"
+    if st.sidebar.button("🔍 Filter Search"):   # ⭐ NEW SIDEBAR BUTTON
+        st.session_state.page = "filter_search"
+    if st.sidebar.button("📊 Group Dashboard"):
+        st.session_state.page = "groupdashboard"
     if st.sidebar.button("📊 Net Lot"):
         st.session_state.page = "net_lot"
     if st.sidebar.button("📈 Trend"):
@@ -767,8 +769,6 @@ def main():
         st.session_state.page = "usd_matrix"
     if st.sidebar.button("🪙 XAUUSD", key="nav_XAUUSD_top"):
         st.session_state.page = "xauusd"
-    if st.sidebar.button("📊 Group Dashboard"):
-        st.session_state.page = "groupdashboard"
 
 
     st.sidebar.header('Data source')
