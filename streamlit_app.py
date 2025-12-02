@@ -20,13 +20,6 @@ from groupdashboard import groupdashboard_view
 from file_management import file_management_view  # ⭐ NEW IMPORT
 from watch_manager import watch_manager_view      # ⭐ NEW IMPORT
 
-# -------------------------------------------------
-# PERSISTENT MT5 CONNECTION - CONNECT ONLY ONCE
-# -------------------------------------------------
-if "mt5_service" not in st.session_state:
-    st.session_state.mt5_service = MT5Service()
-    st.session_state.mt5_service.connect()  # CONNECT ONCE ONLY
-
 # Initialize session state for caches (persistent across reruns)
 if 'positions_cache' not in st.session_state:
     st.session_state.positions_cache = {
@@ -706,7 +699,7 @@ def usd_matrix_view(data):
 
 @st.cache_data(ttl=60)
 def load_from_mt5(use_groups=True):
-    svc = st.session_state.mt5_service   # persistent connection
+    svc = MT5Service()   # persistent connection
 
     if use_groups:
         accounts = svc.list_accounts_by_groups()
