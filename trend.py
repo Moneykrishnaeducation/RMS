@@ -4,12 +4,17 @@ import time
 from datetime import datetime
 from net_lot import get_symbol_net_lot_pnl
 import logging
+import plotly.graph_objects as go
+import plotly.io as pio
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 __all__ = ['display_trend_view']
+
+# Use dark theme for charts
+pio.templates.default = "plotly_dark"
 
 
 def display_trend_view(data):
@@ -24,20 +29,21 @@ def display_trend_view(data):
         st.info('No account data available.')
         return
 
-    # Initialize session state for trend history if not exists
+    # Initialize history only first time
     if 'trend_history' not in st.session_state:
         st.session_state.trend_history = pd.DataFrame(columns=['timestamp', 'symbol', 'net_lot'])
 
     try:
-        # Get current net lot data
+        # Get latest net lot
         current_data = get_symbol_net_lot_pnl(data, st.session_state.get('positions_cache'))
 
         if current_data.empty:
             st.info('No net lot data found.')
             return
 
-        # Add current data to history
         current_time = datetime.now()
+
+        # Add new rows to history
         new_rows = []
         for _, row in current_data.iterrows():
             new_rows.append({
@@ -46,76 +52,92 @@ def display_trend_view(data):
                 'net_lot': row['net_lot']
             })
 
-        # Append to history
         if new_rows:
             new_df = pd.DataFrame(new_rows)
             st.session_state.trend_history = pd.concat([st.session_state.trend_history, new_df], ignore_index=True)
 
-        # Keep only last 100 data points per symbol to avoid memory issues
-        # Group by symbol and keep most recent 100 points
+        # Clean history keep last 100 per symbol
         trend_df = st.session_state.trend_history.copy()
         trend_df['timestamp'] = pd.to_datetime(trend_df['timestamp'])
         trend_df = trend_df.sort_values(['symbol', 'timestamp'])
 
-        # Keep last 100 points per symbol
         filtered_dfs = []
         for symbol in trend_df['symbol'].unique():
-            symbol_df = trend_df[trend_df['symbol'] == symbol].tail(100)
-            filtered_dfs.append(symbol_df)
+            filtered_dfs.append(trend_df[trend_df['symbol'] == symbol].tail(100))
 
-        if filtered_dfs:
-            trend_df = pd.concat(filtered_dfs, ignore_index=True)
-            st.session_state.trend_history = trend_df
+        trend_df = pd.concat(filtered_dfs, ignore_index=True)
+        st.session_state.trend_history = trend_df
 
-        # Get available symbols
+        # Use all symbols
         available_symbols = sorted(current_data['symbol'].tolist())
+        selected_symbols = available_symbols
 
-        # Symbol selector
-        selected_symbols = st.multiselect(
-            'Select symbols to display in trend chart',
-            options=available_symbols,
-            default=available_symbols[:5] if len(available_symbols) >= 5 else available_symbols,
-            key='trend_symbols'
-        )
+        st.write("Displaying trends for all selected symbols.")
 
-        if not selected_symbols:
-            st.info('Please select at least one symbol to display the trend chart.')
-            return
-
-        # Filter data for selected symbols
+        # Filter for UI
         chart_data = trend_df[trend_df['symbol'].isin(selected_symbols)].copy()
 
         if chart_data.empty:
-            st.info('No trend data available for selected symbols.')
+            st.info('No trend data available.')
             return
 
-        # Prepare data for line chart
-        # Pivot to have timestamps as index, symbols as columns
-        pivot_df = chart_data.pivot(index='timestamp', columns='symbol', values='net_lot').fillna(method='ffill')
-
-        # Display metrics
+        # Metrics
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Selected Symbols", len(selected_symbols))
         with col2:
-            total_points = len(chart_data)
-            st.metric("Data Points", total_points)
+            st.metric("Data Points", len(chart_data))
         with col3:
-            last_update = current_time.strftime('%H:%M:%S')
-            st.metric("Last Update", last_update)
+            st.metric("Last Update", current_time.strftime('%H:%M:%S'))
 
-        # Display line chart
-        st.subheader('Net Lot Trend Over Time')
-        st.line_chart(pivot_df)
+        # ------------------------------
+        #   PLOTLY UI (NEW, IMPROVED)
+        # ------------------------------
+        for symbol in selected_symbols:
+            st.subheader(f'{symbol} Net Lot')
 
-        # Show raw data table (optional, collapsible)
+            symbol_data = chart_data[chart_data['symbol'] == symbol].set_index('timestamp')['net_lot']
+
+            fig = go.Figure()
+
+            fig.add_trace(go.Scatter(
+                x=symbol_data.index,
+                y=symbol_data.values,
+                mode="lines+markers",
+                line=dict(width=3),
+                marker=dict(size=6),
+                name=symbol,
+            ))
+
+            # X-axis formatting like screenshot
+            fig.update_xaxes(
+                title="Time",
+                showgrid=True,
+                gridcolor="rgba(255,255,255,0.1)",
+                tickformat="%H:%M<br>%b %d, %Y",
+            )
+
+            fig.update_yaxes(
+                title="Net Lot",
+                showgrid=True,
+                gridcolor="rgba(255,255,255,0.1)",
+            )
+
+            # Layout match MT5 style
+            fig.update_layout(
+                height=350,
+                margin=dict(l=20, r=20, t=40, b=20),
+                showlegend=False,
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+        # Raw data
         with st.expander("📋 View Raw Trend Data"):
             st.dataframe(chart_data.sort_values(['symbol', 'timestamp'], ascending=[True, False]), use_container_width=True)
 
-        # Auto-refresh info
         st.info("📊 Chart updates automatically every 15 seconds. Refresh the page to update now.")
 
-        # Add manual refresh button
         if st.button('🔄 Refresh Now'):
             st.rerun()
 

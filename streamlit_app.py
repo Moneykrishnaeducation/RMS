@@ -767,6 +767,8 @@ def main():
         st.session_state.page = "groupdashboard"
     if st.sidebar.button("📊 Net Lot"):
         st.session_state.page = "net_lot"
+    if st.sidebar.button("📈 Trend"):
+        st.session_state.page = "trend"
 
 
     st.sidebar.header('Data source')
@@ -870,6 +872,8 @@ def main():
         groupdashboard_view()
     elif st.session_state.page == "net_lot":
         display_net_lot_view(data)
+    elif st.session_state.page == "trend":
+        display_trend_view(data)
 
 
 if __name__ == '__main__':
