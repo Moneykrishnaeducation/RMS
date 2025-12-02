@@ -6,7 +6,7 @@ import streamlit as st
 import time
 import threading
 import concurrent.futures
-from pnl_matrix import get_login_symbol_pnl_matrix, get_login_symbol_profit_matrix, display_login_symbol_profit_pivot_table
+from pnl_matrix import get_login_symbol_pnl_matrix
 from MT5Service import MT5Service
 from accounts import accounts_view
 from profile import profile_view
@@ -18,6 +18,12 @@ from trend import display_trend_view              # ⭐ NEW IMPORT
 from XAUUSD import get_xauusd_data
 from groupdashboard import groupdashboard_view
 
+# -------------------------------------------------
+# PERSISTENT MT5 CONNECTION - CONNECT ONLY ONCE
+# -------------------------------------------------
+if "mt5_service" not in st.session_state:
+    st.session_state.mt5_service = MT5Service()
+    st.session_state.mt5_service.connect()  # CONNECT ONCE ONLY
 
 # Initialize session state for caches (persistent across reruns)
 if 'positions_cache' not in st.session_state:
@@ -632,7 +638,7 @@ def matrix_lot_view(data):
     st.subheader('Login vs Symbol Matrix - Net Lot')
     
     # Create tabs for four views
-    tab1, tab2, tab3, tab4 = st.tabs(["🎯 Pivot Matrix (Lot)", "💰 Profit/Loss Matrix", "📋 Detailed Position Table", "🔢 Classic Matrix"])
+    tab1, tab2 = st.tabs(["🎯 Pivot Matrix (Lot)", "📋 Detailed Position Table"])
     
     with tab1:
         st.write("Login × Symbol pivot table showing net lots at intersections.")
@@ -643,43 +649,12 @@ def matrix_lot_view(data):
             st.error(f'Failed to display pivot table: {e}')
     
     with tab2:
-        st.write("Login × Symbol pivot table showing profit/loss (USD P&L) from open positions.")
-        try:
-            with st.spinner('Loading profit/loss matrix...'):
-                display_login_symbol_profit_pivot_table(data, st.session_state.positions_cache)
-        except Exception as e:
-            st.error(f'Failed to display profit/loss matrix: {e}')
-    
-    with tab3:
         st.write("This view shows individual positions organized by Symbol and Login.")
         try:
             with st.spinner('Loading positions...'):
                 display_position_table(data)
         except Exception as e:
             st.error(f'Failed to display positions: {e}')
-    
-    with tab4:
-        st.write("This matrix shows the net lot (buy volume - sell volume) for each login across specified symbols.")
-        if data.empty:
-            st.info('No account data available.')
-            return
-
-        try:
-            with st.spinner('Generating net lot matrix...'):
-                matrix_df = get_login_symbol_matrix(data)
-
-            if matrix_df.empty:
-                st.info('No open positions found for the accounts.')
-            else:
-                st.dataframe(matrix_df)
-
-                # Export to CSV
-                buf = io.StringIO()
-                matrix_df.to_csv(buf, index=False)
-                st.download_button('Download Matrix CSV', data=buf.getvalue(), file_name='net_lot_matrix.csv', mime='text/csv')
-
-        except Exception as e:
-            st.error(f'Failed to generate matrix: {e}')
 
 def usd_matrix_view(data):
     st.subheader('Login vs Symbol Matrix - USD P&L')
@@ -723,17 +698,17 @@ def usd_matrix_view(data):
 
 @st.cache_data(ttl=60)
 def load_from_mt5(use_groups=True):
-    """Fetch accounts from MT5 using MT5Service. Cached for 5 seconds by default."""
-    svc = MT5Service()
+    svc = st.session_state.mt5_service   # persistent connection
+
     if use_groups:
         accounts = svc.list_accounts_by_groups()
     else:
-        # Fallback to range-based scan for more complete enumeration
         accounts = svc.list_accounts_by_range(start=1, end=100000)
+
     if not accounts:
         return pd.DataFrame()
-    return pd.json_normalize(accounts)
 
+    return pd.json_normalize(accounts)
 
 def main():
     # Start background position scanner thread (only once)

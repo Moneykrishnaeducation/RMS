@@ -23,7 +23,7 @@ def get_login_symbol_matrix(accounts_df=None, positions_cache=None):
         logins = accounts_df['login'].astype(str).unique()      
     else:
         # Fallback to fetching all accounts
-        accounts = svc.list_mt5_accounts()
+        accounts = svc.list_deals_by_login()
         if not accounts:
             return pd.DataFrame()
         logins = [acc["Login"] for acc in accounts]
@@ -62,7 +62,7 @@ def get_login_symbol_matrix(accounts_df=None, positions_cache=None):
                     continue
 
                 symbol = p.get('Symbol') or p.get('symbol')
-                volume = p.get('Vol') or p.get('volume') or 0
+                volume = p.get('Vol') or p.get('volume')
                 order_type = p.get('Type') or p.get('type')
 
                 try:
@@ -90,7 +90,7 @@ def get_login_symbol_matrix(accounts_df=None, positions_cache=None):
 
         else:
             # Fallback: query MT5Service per-login
-            positions = svc.get_open_positions(login)
+            positions = svc.list_deals_by_login(login)
             for p in positions or []:
                 symbol = p.get('symbol') or p.get('Symbol')
                 volume = p.get('volume') or p.get('Volume') or 0
