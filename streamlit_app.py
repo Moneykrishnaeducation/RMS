@@ -17,6 +17,8 @@ from net_lot import display_net_lot_view          # ⭐ NEW IMPORT
 from trend import display_trend_view              # ⭐ NEW IMPORT
 from XAUUSD import get_xauusd_data
 from groupdashboard import groupdashboard_view
+from file_management import file_management_view  # ⭐ NEW IMPORT
+from watch_manager import watch_manager_view      # ⭐ NEW IMPORT
 
 
 # Initialize session state for caches (persistent across reruns)
@@ -76,7 +78,7 @@ nav_css = """
 def render_nav():
     st.markdown(nav_css, unsafe_allow_html=True)
     st.markdown('<div class="nav-container">', unsafe_allow_html=True)
-    col1, col2, col3, col4, col5, col6, col7, col8, col9, col10 = st.columns(10)
+    col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12 = st.columns(12)
     with col1:
         if st.button("🏠 Dashboard", key="nav_dashboard"):
             st.session_state.page = "dashboard"
@@ -108,7 +110,13 @@ def render_nav():
     with col10:
         if st.button("📊 Net Lot", key="nav_net_lot"):
             st.session_state.page = "net_lot"
-    
+    with col11:
+        if st.button("📁 File Management", key="nav_file_management"):
+            st.session_state.page = "file_management"
+    with col12:
+        if st.button("👀 Watch Manager", key="nav_watch_manager"):
+            st.session_state.page = "watch_manager"
+
 
 
     st.markdown('</div>', unsafe_allow_html=True)
@@ -780,6 +788,10 @@ def main():
         st.session_state.page = "usd_matrix"
     if st.sidebar.button("🪙 XAUUSD", key="nav_XAUUSD_top"):
         st.session_state.page = "xauusd"
+    if st.sidebar.button("📁 File Management", key="nav_file_management_sidebar"):
+        st.session_state.page = "file_management"
+    if st.sidebar.button("👀 Watch Manager", key="nav_watch_manager_sidebar"):
+        st.session_state.page = "watch_manager"
 
 
     st.sidebar.header('Data source')
@@ -885,6 +897,10 @@ def main():
         display_net_lot_view(data)
     elif st.session_state.page == "trend":
         display_trend_view(data)
+    elif st.session_state.page == "file_management":
+        file_management_view()
+    elif st.session_state.page == "watch_manager":
+        watch_manager_view()
 
 
 if __name__ == '__main__':
