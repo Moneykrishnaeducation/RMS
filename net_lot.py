@@ -72,7 +72,7 @@ def get_symbol_net_lot_pnl(accounts_df=None, positions_cache=None):
     df = df.sort_values('abs_net_lot', ascending=False).drop(columns=['abs_net_lot'])
 
     logger.info(f"✅ SYMBOL NET LOT DATA LOADED: {len(df)} symbols")
-    logger.info(f"📊 FIRST 5 SYMBOLS: {df.head().to_dict('records')}")
+    logger.info(f"📊 FIRST 5 SYMBOLS: {df.head(100).to_dict('records')}")
 
     return df
 

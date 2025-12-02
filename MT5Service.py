@@ -68,8 +68,8 @@ class MT5Service:
         MT5Manager.InitializeManagerAPIPath(module_path=inst, work_path=inst)
         self.manager = MT5Manager.ManagerAPI()
 
-    def connect(self):
-        """Connect to MT5 Manager. Raises Exception on failure."""
+    def connect(self, max_retries=3, retry_delay=5):
+        """Connect to MT5 Manager. Raises Exception on failure after retries."""
         with MT5Service._shared_lock:
             if MT5Service._shared_manager and getattr(MT5Service._shared_manager, 'connected', False):
                 return MT5Service._shared_manager
@@ -86,23 +86,38 @@ class MT5Service:
                 # fallback to numeric pump_mode already set
                 pump = self.pump_mode
 
-            if not MT5Service._shared_manager.Connect(self.address, int(self.login), str(self.password), pump, int(self.timeout)):
-                # try one more time with numeric fallback 1
-                last = MT5Manager.LastError()
+            for attempt in range(max_retries + 1):
                 try:
-                    if pump != 1:
-                        if MT5Service._shared_manager.Connect(self.address, int(self.login), str(self.password), 1, int(self.timeout)):
+                    if MT5Service._shared_manager.Connect(self.address, int(self.login), str(self.password), pump, int(self.timeout)):
+                        # mark connected
+                        try:
                             MT5Service._shared_manager.connected = True
-                            return MT5Service._shared_manager
-                except Exception:
-                    pass
-                raise Exception(f"Failed to connect to MT5 Manager: {last}")
-            # mark connected
-            try:
-                MT5Service._shared_manager.connected = True
-            except Exception:
-                pass
-            return MT5Service._shared_manager
+                        except Exception:
+                            pass
+                        return MT5Service._shared_manager
+                    else:
+                        last = MT5Manager.LastError()
+                        # Check if it's a network error (code 7)
+                        if hasattr(last, 'code') and last.code == 7:
+                            if attempt < max_retries:
+                                print(f"Network error connecting to MT5 Manager (attempt {attempt + 1}/{max_retries + 1}). Retrying in {retry_delay} seconds...")
+                                time.sleep(retry_delay)
+                                continue
+                        # try one more time with numeric fallback 1 if not network error or last attempt
+                        if pump != 1 and attempt == max_retries:
+                            try:
+                                if MT5Service._shared_manager.Connect(self.address, int(self.login), str(self.password), 1, int(self.timeout)):
+                                    MT5Service._shared_manager.connected = True
+                                    return MT5Service._shared_manager
+                            except Exception:
+                                pass
+                        raise Exception(f"Failed to connect to MT5 Manager after {max_retries + 1} attempts: {last}")
+                except Exception as e:
+                    if attempt < max_retries:
+                        print(f"Exception connecting to MT5 Manager (attempt {attempt + 1}/{max_retries + 1}): {e}. Retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+                    else:
+                        raise e
 
     def close(self):
         try:
