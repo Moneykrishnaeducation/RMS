@@ -247,7 +247,7 @@ def display_login_symbol_pnl_pivot(accounts_df=None, positions_cache=None):
         function autoRefreshTable() {
             setTimeout(function() {
                 window.location.reload();
-            }, 5000);
+            }, 15000);
         }
         autoRefreshTable();
         </script>
@@ -310,7 +310,7 @@ def display_login_symbol_profit_pivot_table(accounts_df=None, positions_cache=No
         function autoRefreshTable() {
             setTimeout(function() {
                 window.location.reload();
-            }, 5000);
+            }, 15000);
         }
         autoRefreshTable();
         </script>

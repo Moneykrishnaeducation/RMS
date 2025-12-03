@@ -31,7 +31,7 @@ def display_trend_view(data):
         function autoRefreshTable() {
             setTimeout(function() {
                 window.location.reload();
-            }, 5000);
+            }, 15000);
         }
         autoRefreshTable();
         </script>

@@ -90,7 +90,7 @@ def display_net_lot_view(data):
         function autoRefreshTable() {
             setTimeout(function() {
                 window.location.reload();
-            }, 5000);
+            }, 15000);
         }
         autoRefreshTable();
         </script>

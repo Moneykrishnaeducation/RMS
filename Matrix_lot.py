@@ -368,7 +368,7 @@ def display_position_table(accounts_df=None, positions_cache=None, show_details=
         function autoRefreshTable() {
             setTimeout(function() {
                 window.location.reload();
-            }, 5000);
+            }, 15000);
         }
         autoRefreshTable();
         </script>

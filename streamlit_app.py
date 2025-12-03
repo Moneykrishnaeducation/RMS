@@ -183,7 +183,7 @@ def dashboard_view(data):
         function autoRefreshTable() {
             setTimeout(function() {
                 window.location.reload();
-            }, 5000);
+            }, 15000);
         }
         autoRefreshTable();
         </script>
@@ -344,7 +344,7 @@ def reports_view(data):
         function autoRefreshTable() {
             setTimeout(function() {
                 window.location.reload();
-            }, 5000);
+            }, 15000);
         }
         autoRefreshTable();
         </script>
@@ -370,7 +370,7 @@ def positions_view(data):
         function autoRefreshTable() {
             setTimeout(function() {
                 window.location.reload();
-            }, 5000);
+            }, 15000);
         }
         autoRefreshTable();
         </script>
@@ -579,7 +579,7 @@ def pl_view(data):
         function autoRefreshTable() {
             setTimeout(function() {
                 window.location.reload();
-            }, 5000);
+            }, 15000);
         }
         autoRefreshTable();
         </script>
@@ -630,7 +630,7 @@ def groups_view(data):
         function autoRefreshTable() {
             setTimeout(function() {
                 window.location.reload();
-            }, 5000);
+            }, 15000);
         }
         autoRefreshTable();
         </script>
@@ -822,7 +822,7 @@ def matrix_lot_view(data):
         function autoRefreshTable() {
             setTimeout(function() {
                 window.location.reload();
-            }, 5000);
+            }, 15000);
         }
         autoRefreshTable();
         </script>
@@ -856,7 +856,7 @@ def usd_matrix_view(data):
         function autoRefreshTable() {
             setTimeout(function() {
                 window.location.reload();
-            }, 5000);
+            }, 15000);
         }
         autoRefreshTable();
         </script>
