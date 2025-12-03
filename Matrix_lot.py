@@ -292,10 +292,22 @@ def display_login_symbol_pivot_table(accounts_df=None, positions_cache=None):
     Display pivot table with Login as rows and Symbol as columns (like the image).
     Each cell shows the net lot volume for that Login-Symbol combination.
     """
+    # Auto-refresh every 5 seconds
+    st.markdown("""
+        <script>
+        function autoRefreshTable() {
+            setTimeout(function() {
+                window.location.reload();
+            }, 500);
+        }
+        autoRefreshTable();
+        </script>
+    """, unsafe_allow_html=True)
+
     logger.info("=" * 80)
     logger.info("DISPLAYING LOGIN x SYMBOL PIVOT TABLE")
     logger.info("=" * 80)
-    
+
     st.subheader('📊 Login vs Symbol - Matrix View (Pivot Table)')
     st.write("**Rows: Login IDs | Columns: Symbols | Values: Net Lot Volume**")
     
