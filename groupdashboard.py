@@ -158,4 +158,4 @@ class MT5Service:
             return out
 
         except Exception:
-            return []
+            return []      
