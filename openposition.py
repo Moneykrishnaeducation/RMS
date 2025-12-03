@@ -50,11 +50,14 @@ def positions_details_view(data):
             st.session_state.all_positions_dict[login] = []
             for p in positions:
                 # Map the keys to match the display columns: ID, Symbol, Vol, Price, P/L
+                volume = p.get('volume')
+                if volume is not None:
+                    volume = abs(float(volume))  # Ensure volume is positive
                 position_data = {
                     'Login': login,  # Add login for reference
                     'ID': p.get('id'),
                     'Symbol': p.get('symbol'),
-                    'Vol': p.get('volume'),
+                    'Vol': volume,
                     'Price': p.get('price'),
                     'P/L': p.get('profit'),
                     'Type': p.get('type')
