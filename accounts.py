@@ -80,3 +80,4 @@ def accounts_view(data, accounts_cache):
     if 'balance' in data.columns:
         worst_bal = data.sort_values('balance', ascending=True).head(10)[['login', 'name', 'group', 'balance']]
         st.table(worst_bal)
+
