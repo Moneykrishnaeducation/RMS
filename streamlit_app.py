@@ -137,40 +137,52 @@ def render_nav():
     with col1:
         if st.button("🏠 Dashboard", key="nav_dashboard"):
             st.session_state.page = "dashboard"
+            st.query_params['page'] = "Dashboard"
     with col2:
         if st.button("👥 Accounts", key="nav_accounts"):
             st.session_state.page = "accounts"
+            st.query_params['page'] = "Accounts"
     with col3:
         if st.button("📊 Reports", key="nav_reports"):
             st.session_state.page = "reports"
+            st.query_params['page'] = "Reports"
     with col4:
         if st.button("🔍 Filter Search", key="nav_filter_search_top"):   # ⭐ NEW BUTTON
             st.session_state.page = "filter_search"
+            st.query_params['page'] = "Filter Search"
     with col5:
         if st.button("👥 Groups", key="nav_groups_top"):
             st.session_state.page = "groups"
+            st.query_params['page'] = "Groups"
 
     with col6:
         if st.button("📊 Matrix Lot", key="nav_matrix_lot"):
             st.session_state.page = "matrix_lot"
+            st.query_params['page'] = "Matrix Lot"
     with col7:
         if st.button("📉 View USD P&L Matrix", key="nav_usd_matrix"):
             st.session_state.page = "usd_matrix"
+            st.query_params['page'] = "USD Matrix"
     with col8:
         if st.button("📉XAUUSD", key="nav_xauusd"):
             st.session_state.page = "xauusd"
+            st.query_params['page'] = "XAUUSD"
     with col9:
         if st.button("📊 Group Dashboard", key="nav_group_dashboard_top"):
             st.session_state.page = "groupdashboard"
+            st.query_params['page'] = "Group Dashboard"
     with col10:
         if st.button("📊 Net Lot", key="nav_net_lot"):
             st.session_state.page = "net_lot"
+            st.query_params['page'] = "Net Lot"
     with col11:
         if st.button("📁 File Management", key="nav_file_management"):
             st.session_state.page = "file_management"
+            st.query_params['page'] = "File Management"
     with col12:
         if st.button("👀 Watch Manager", key="nav_watch_manager"):
             st.session_state.page = "watch_manager"
+            st.query_params['page'] = "Watch Manager"
 
 
 
@@ -923,47 +935,89 @@ def main():
 
     st.set_page_config(page_title='RMS - Accounts', layout='wide')
     st.title('RMS — Accounts Dashboard (Streamlit)')
-    
+
     # Auto refresh removed
+
+    # Page mapping for URL navigation
+    page_mapping = {
+        "Dashboard": "dashboard",
+        "Accounts": "accounts",
+        "Profile": "profile",
+        "Reports": "reports",
+        "Positions": "positions",
+        "P/L": "pl",
+        "Groups": "groups",
+        "Filter Search": "filter_search",
+        "Group Dashboard": "groupdashboard",
+        "Net Lot": "net_lot",
+        "Trend": "trend",
+        "Matrix Lot": "matrix_lot",
+        "USD Matrix": "usd_matrix",
+        "XAUUSD": "xauusd",
+        "File Management": "file_management",
+        "Watch Manager": "watch_manager"
+    }
 
     # Initialize session state for page
     if 'page' not in st.session_state:
         st.session_state.page = 'dashboard'
 
+    # Check URL query params for page navigation
+    if 'page' in st.query_params:
+        query_page = st.query_params['page']
+        if query_page in page_mapping:
+            st.session_state.page = page_mapping[query_page]
+
     # Sidebar navigation
     st.sidebar.header('Navigation')
     if st.sidebar.button("🏠 Dashboard", key="nav_dashboard"):
         st.session_state.page = "dashboard"
+        st.query_params['page'] = "Dashboard"
     if st.sidebar.button("👥 Accounts", key="nav_accounts"):
         st.session_state.page = "accounts"
+        st.query_params['page'] = "Accounts"
     if st.sidebar.button("👤 Profile", key="nav_profile"):
         st.session_state.page = "profile"
+        st.query_params['page'] = "Profile"
     if st.sidebar.button("📊 Reports", key="nav_reports"):
         st.session_state.page = "reports"
+        st.query_params['page'] = "Reports"
     if st.sidebar.button("📈 Open Positions", key="nav_positions"):
         st.session_state.page = "positions"
+        st.query_params['page'] = "Positions"
     if st.sidebar.button("💰 P/L", key="nav_pl"):
         st.session_state.page = "pl"
+        st.query_params['page'] = "P/L"
     if st.sidebar.button("👥 Groups", key="nav_groups"):
         st.session_state.page = "groups"
+        st.query_params['page'] = "Groups"
     if st.sidebar.button("🔍 Filter Search"):   # ⭐ NEW SIDEBAR BUTTON
         st.session_state.page = "filter_search"
+        st.query_params['page'] = "Filter Search"
     if st.sidebar.button("📊 Group Dashboard"):
         st.session_state.page = "groupdashboard"
+        st.query_params['page'] = "Group Dashboard"
     if st.sidebar.button("📊 Net Lot"):
         st.session_state.page = "net_lot"
+        st.query_params['page'] = "Net Lot"
     if st.sidebar.button("📈 Trend"):
         st.session_state.page = "trend"
+        st.query_params['page'] = "Trend"
     if st.sidebar.button("📊 Matrix Lot", key="nav_matrix_lot"):
         st.session_state.page = "matrix_lot"
+        st.query_params['page'] = "Matrix Lot"
     if st.sidebar.button("📉 View USD P&L Matrix", key="nav_usd_matrix_sidebar"):
         st.session_state.page = "usd_matrix"
+        st.query_params['page'] = "USD Matrix"
     if st.sidebar.button("🪙 XAUUSD", key="nav_XAUUSD_top"):
         st.session_state.page = "xauusd"
+        st.query_params['page'] = "XAUUSD"
     if st.sidebar.button("📁 File Management", key="nav_file_management_sidebar"):
         st.session_state.page = "file_management"
+        st.query_params['page'] = "File Management"
     if st.sidebar.button("👀 Watch Manager", key="nav_watch_manager_sidebar"):
         st.session_state.page = "watch_manager"
+        st.query_params['page'] = "Watch Manager"
 
 
     st.sidebar.header('Data source')
