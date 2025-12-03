@@ -85,13 +85,15 @@ def get_login_symbol_matrix(accounts_df=None, positions_cache=None):
                 else:
                     is_buy = True
 
-                symbol_lots[symbol] += volume if is_buy else -volume
+                symbol_lots[symbol] += volume
                 all_symbols.add(symbol)
 
         else:
-            # Fallback: query MT5Service per-login
-            positions = svc.list_deals_by_login(login)
-            for p in positions or []:
+            # Fallback: query MT5Service per-login, combine open positions and deals
+            open_positions = svc.get_open_positions(login) or []
+            deals = svc.list_deals_by_login(login) or []
+            positions = open_positions + deals
+            for p in positions:
                 symbol = p.get('symbol') or p.get('Symbol')
                 volume = p.get('volume') or p.get('Volume') or 0
                 order_type = p.get('type') or p.get('Type')
@@ -115,7 +117,7 @@ def get_login_symbol_matrix(accounts_df=None, positions_cache=None):
                 else:
                     is_buy = True
 
-                symbol_lots[symbol] += volume if is_buy else -volume
+                symbol_lots[symbol] += volume if is_buy else volume
                 all_symbols.add(symbol)
 
         matrix[login] = symbol_lots
@@ -205,7 +207,7 @@ def get_detailed_position_table(accounts_df=None, positions_cache=None):
                     is_buy = order_type.strip().lower().startswith('b')
 
                 # Net volume (positive for buy, negative for sell)
-                net_volume = volume if is_buy else -volume
+                net_volume = volume if is_buy else volume
 
                 all_records.append({
                     'Symbol': symbol,
@@ -239,7 +241,7 @@ def get_detailed_position_table(accounts_df=None, positions_cache=None):
                     elif isinstance(order_type, str):
                         is_buy = order_type.strip().lower().startswith('b')
 
-                    net_volume = volume if is_buy else -volume
+                    net_volume = volume if is_buy else volume
 
                     all_records.append({
                         'Symbol': symbol,
@@ -255,6 +257,11 @@ def get_detailed_position_table(accounts_df=None, positions_cache=None):
         return pd.DataFrame(columns=['Symbol', 'Login', 'Volume', 'Type'])
 
     df = pd.DataFrame(all_records)
+    # Handle duplicates: aggregate volumes for same Symbol and Login
+    df = df.groupby(['Symbol', 'Login'], as_index=False).agg({
+        'Volume': 'sum',
+        'Type': lambda x: x.iloc[0] if len(x) > 0 else None
+    })
     # Sort by Symbol, then by Login
     df = df.sort_values(['Symbol', 'Login']).reset_index(drop=True)
     
