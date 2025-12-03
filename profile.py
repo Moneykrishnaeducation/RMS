@@ -69,6 +69,8 @@ def display_account_details(login_id):
     positions = svc.get_open_positions(login_id)
     if positions:
         st.subheader('Open Positions')
-        st.table(pd.DataFrame(positions))
+        df = pd.DataFrame(positions)
+        df['volume'] = df['volume'].map('{:.2f}'.format)
+        st.table(df)
     else:
         st.info('No open positions.')
