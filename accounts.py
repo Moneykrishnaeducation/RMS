@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-def accounts_view(data):
+def accounts_view(data, accounts_cache):
 
     # ------------------------------
     # Account type buttons
