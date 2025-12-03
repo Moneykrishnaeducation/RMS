@@ -89,8 +89,7 @@ def display_net_lot_view(data):
         return
 
     try:
-        with st.spinner('Loading net lot data...'):
-            df = get_symbol_net_lot_pnl(data, st.session_state.get('positions_cache'))
+        df = get_symbol_net_lot_pnl(data, st.session_state.get('positions_cache'))
 
         if df.empty:
             st.info('No net lot data found.')
