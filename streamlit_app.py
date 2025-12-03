@@ -6,6 +6,7 @@ import streamlit as st
 import time
 import threading
 import concurrent.futures
+import logging
 from pnl_matrix import get_login_symbol_pnl_matrix
 from MT5Service import MT5Service
 from accounts import accounts_view
@@ -121,6 +122,18 @@ def render_nav():
     st.markdown('</div>', unsafe_allow_html=True)
 
 def dashboard_view(data):
+    # Auto-refresh every 5 seconds
+    st.markdown("""
+        <script>
+        function autoRefreshTable() {
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        }
+        autoRefreshTable();
+        </script>
+    """, unsafe_allow_html=True)
+
     # Top-level KPIs
     total_accounts = len(data)
     total_balance = data.get('balance', pd.Series(0)).astype(float).sum()
@@ -270,6 +283,18 @@ def dashboard_view(data):
 
 
 def reports_view(data):
+    # Auto-refresh every 5 seconds
+    st.markdown("""
+        <script>
+        function autoRefreshTable() {
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        }
+        autoRefreshTable();
+        </script>
+    """, unsafe_allow_html=True)
+
     st.subheader('Reports')
     # Add some report elements, e.g., tables and charts
     if 'group' in data.columns:
@@ -284,6 +309,18 @@ def reports_view(data):
     st.download_button('Download CSV', data=buf.getvalue(), file_name='accounts.csv', mime='text/csv')
 
 def positions_view(data):
+    # Auto-refresh every 5 seconds
+    st.markdown("""
+        <script>
+        function autoRefreshTable() {
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        }
+        autoRefreshTable();
+        </script>
+    """, unsafe_allow_html=True)
+
     st.subheader('All Open Positions')
 
     # Use cached data from background scanner
@@ -478,6 +515,18 @@ def positions_view(data):
 
 
 def pl_view(data):
+    # Auto-refresh every 5 seconds
+    st.markdown("""
+        <script>
+        function autoRefreshTable() {
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        }
+        autoRefreshTable();
+        </script>
+    """, unsafe_allow_html=True)
+
     st.subheader('Profit/Loss Overview')
 
     # Account type buttons
@@ -517,6 +566,18 @@ def pl_view(data):
         st.info('No profit/loss data available.')
 
 def groups_view(data):
+    # Auto-refresh every 5 seconds
+    st.markdown("""
+        <script>
+        function autoRefreshTable() {
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        }
+        autoRefreshTable();
+        </script>
+    """, unsafe_allow_html=True)
+
     st.subheader('Groups Overview')
 
     if 'group' in data.columns:
@@ -543,6 +604,7 @@ def groups_view(data):
 
 def scan_single_account(login, svc, accounts_df):
     """Helper function to scan positions for a single account"""
+    logger = logging.getLogger(__name__)
     positions_data = []
     try:
         positions = svc.get_open_positions(login)
@@ -566,7 +628,14 @@ def scan_single_account(login, svc, accounts_df):
                     position_data['Group'] = account_row['group'].iloc[0] if 'group' in account_row.columns else ''
                 positions_data.append(position_data)
     except Exception as e:
-        print(f"Error scanning positions for login {login}: {e}")
+        error_str = str(e).lower()
+        is_network_error = ('network' in error_str or 'connection' in error_str or
+                          'timeout' in error_str or 'socket' in error_str)
+
+        if is_network_error:
+            logger.warning(f"Network error scanning positions for login {login}: {e}. Skipping this login and continuing with others.")
+        else:
+            logger.error(f"Error scanning positions for login {login}: {e}")
     return positions_data
 
 def background_position_scanner():
@@ -636,6 +705,18 @@ def background_position_scanner():
         time.sleep(1)
 
 def matrix_lot_view(data):
+    # Auto-refresh every 5 seconds
+    st.markdown("""
+        <script>
+        function autoRefreshTable() {
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        }
+        autoRefreshTable();
+        </script>
+    """, unsafe_allow_html=True)
+
     st.subheader('Login vs Symbol Matrix - Net Lot')
     
     # Create tabs for four views
@@ -658,6 +739,18 @@ def matrix_lot_view(data):
             st.error(f'Failed to display positions: {e}')
 
 def usd_matrix_view(data):
+    # Auto-refresh every 5 seconds
+    st.markdown("""
+        <script>
+        function autoRefreshTable() {
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        }
+        autoRefreshTable();
+        </script>
+    """, unsafe_allow_html=True)
+
     st.subheader('Login vs Symbol Matrix - USD P&L')
     st.write("This matrix shows the total USD P&L for each login across specified symbols from open positions.")
 

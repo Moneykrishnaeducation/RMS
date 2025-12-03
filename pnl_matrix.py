@@ -241,6 +241,18 @@ def display_login_symbol_pnl_pivot(accounts_df=None, positions_cache=None):
     st.subheader("📈 Login vs Symbol Matrix - USD P&L")
     st.write("Rows: Login | Columns: Symbol | Values: USD P&L (open positions)")
 
+    # Auto-refresh every 5 seconds
+    st.markdown("""
+        <script>
+        function autoRefreshTable() {
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        }
+        autoRefreshTable();
+        </script>
+    """, unsafe_allow_html=True)
+
     try:
         df = get_login_symbol_pnl_from_open_positions(accounts_df, positions_cache)
 
@@ -288,9 +300,21 @@ def display_login_symbol_profit_pivot_table(accounts_df=None, positions_cache=No
     logger.info("=" * 80)
     logger.info("DISPLAYING LOGIN x SYMBOL PROFIT/LOSS PIVOT TABLE")
     logger.info("=" * 80)
-    
+
     st.subheader('📊 Login vs Symbol - Profit/Loss Matrix (Open Positions)')
     st.write("**Rows: Login IDs | Columns: Symbols | Values: USD P&L (Profit/Loss)**")
+
+    # Auto-refresh every 5 seconds
+    st.markdown("""
+        <script>
+        function autoRefreshTable() {
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        }
+        autoRefreshTable();
+        </script>
+    """, unsafe_allow_html=True)
     
     try:
         # Get the profit matrix

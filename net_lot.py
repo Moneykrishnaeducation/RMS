@@ -84,6 +84,18 @@ def display_net_lot_view(data):
     st.subheader('📊 Net Lot Data by Symbol')
     st.write("This table shows aggregated net lots and USD P&L for each symbol across all logins.")
 
+    # Auto-refresh every 5 seconds
+    st.markdown("""
+        <script>
+        function autoRefreshTable() {
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        }
+        autoRefreshTable();
+        </script>
+    """, unsafe_allow_html=True)
+
     if data.empty:
         st.info('No account data available.')
         return

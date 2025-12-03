@@ -20,10 +20,22 @@ pio.templates.default = "plotly_dark"
 def display_trend_view(data):
     """
     Display trend line chart for Net Lot over Time for selected symbols.
-    Updates every 15 seconds via page reload.
+    Updates every 5 seconds via page reload.
     """
     st.subheader('📈 Net Lot Trend - Line Chart')
-    st.write("This chart shows the trend of Net Lot over time for selected symbols. Data updates every 15 seconds.")
+    st.write("This chart shows the trend of Net Lot over time for selected symbols. Data updates every 5 seconds.")
+
+    # Auto-refresh every 5 seconds
+    st.markdown("""
+        <script>
+        function autoRefreshTable() {
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        }
+        autoRefreshTable();
+        </script>
+    """, unsafe_allow_html=True)
 
     if data.empty:
         st.info('No account data available.')

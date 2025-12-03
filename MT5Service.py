@@ -3,6 +3,7 @@ import MT5Manager
 import time
 import json
 import threading
+import logging
 from datetime import datetime
 
 __all__ = ['MT5Service']
@@ -68,41 +69,76 @@ class MT5Service:
         MT5Manager.InitializeManagerAPIPath(module_path=inst, work_path=inst)
         self.manager = MT5Manager.ManagerAPI()
 
-    def connect(self):
-        """Connect to MT5 Manager. Raises Exception on failure."""
+    def connect(self, max_retries=3, retry_delay=2.0):
+        """Connect to MT5 Manager with retry logic for network errors. Raises Exception on failure."""
+        logger = logging.getLogger(__name__)
+
         with MT5Service._shared_lock:
             if MT5Service._shared_manager and getattr(MT5Service._shared_manager, 'connected', False):
                 return MT5Service._shared_manager
-            self._init_manager()
-            MT5Service._shared_manager = self.manager
-            # Choose pump mode: prefer library constant if available, else use provided numeric
-            pump = self.pump_mode
-            try:
-                # Try to use enum constant if present (safer than hardcoding numeric)
-                pump_enum = getattr(MT5Manager.ManagerAPI, 'EnPumpModes', None)
-                if pump_enum and hasattr(pump_enum, 'PUMP_MODE_FULL'):
-                    pump = pump_enum.PUMP_MODE_FULL
-            except Exception:
-                # fallback to numeric pump_mode already set
-                pump = self.pump_mode
 
-            if not MT5Service._shared_manager.Connect(self.address, int(self.login), str(self.password), pump, int(self.timeout)):
-                # try one more time with numeric fallback 1
-                last = MT5Manager.LastError()
+            for attempt in range(max_retries + 1):
                 try:
-                    if pump != 1:
-                        if MT5Service._shared_manager.Connect(self.address, int(self.login), str(self.password), 1, int(self.timeout)):
-                            MT5Service._shared_manager.connected = True
-                            return MT5Service._shared_manager
-                except Exception:
-                    pass
-                raise Exception(f"Failed to connect to MT5 Manager: {last}")
-            # mark connected
-            try:
-                MT5Service._shared_manager.connected = True
-            except Exception:
-                pass
-            return MT5Service._shared_manager
+                    self._init_manager()
+                    MT5Service._shared_manager = self.manager
+
+                    # Choose pump mode: prefer library constant if available, else use provided numeric
+                    pump = self.pump_mode
+                    try:
+                        # Try to use enum constant if present (safer than hardcoding numeric)
+                        pump_enum = getattr(MT5Manager.ManagerAPI, 'EnPumpModes', None)
+                        if pump_enum and hasattr(pump_enum, 'PUMP_MODE_FULL'):
+                            pump = pump_enum.PUMP_MODE_FULL
+                    except Exception:
+                        # fallback to numeric pump_mode already set
+                        pump = self.pump_mode
+
+                    if not MT5Service._shared_manager.Connect(self.address, int(self.login), str(self.password), pump, int(self.timeout)):
+                        # try one more time with numeric fallback 1
+                        last = MT5Manager.LastError()
+                        try:
+                            if pump != 1:
+                                if MT5Service._shared_manager.Connect(self.address, int(self.login), str(self.password), 1, int(self.timeout)):
+                                    MT5Service._shared_manager.connected = True
+                                    logger.info(f"Successfully connected to MT5 Manager on attempt {attempt + 1}")
+                                    return MT5Service._shared_manager
+                        except Exception:
+                            pass
+
+                        # Check if it's a network error that should be retried
+                        error_str = str(last).lower()
+                        is_network_error = ('network' in error_str or 'connection' in error_str or
+                                          'timeout' in error_str or 'socket' in error_str)
+
+                        if is_network_error and attempt < max_retries:
+                            logger.warning(f"Network error connecting to MT5 Manager (attempt {attempt + 1}/{max_retries + 1}): {last}. Retrying in {retry_delay}s...")
+                            time.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                            continue
+                        else:
+                            raise Exception(f"Failed to connect to MT5 Manager: {last}")
+
+                    # mark connected
+                    try:
+                        MT5Service._shared_manager.connected = True
+                        logger.info(f"Successfully connected to MT5 Manager on attempt {attempt + 1}")
+                    except Exception:
+                        pass
+                    return MT5Service._shared_manager
+
+                except Exception as e:
+                    error_str = str(e).lower()
+                    is_network_error = ('network' in error_str or 'connection' in error_str or
+                                      'timeout' in error_str or 'socket' in error_str)
+
+                    if is_network_error and attempt < max_retries:
+                        logger.warning(f"Network error connecting to MT5 Manager (attempt {attempt + 1}/{max_retries + 1}): {e}. Retrying in {retry_delay}s...")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                        continue
+                    else:
+                        logger.error(f"Failed to connect to MT5 Manager after {attempt + 1} attempts: {e}")
+                        raise e
 
     def close(self):
         try:
@@ -167,25 +203,41 @@ class MT5Service:
 
     def get_open_positions(self, login_id):
         """Return list of open positions for the given login id."""
+        logger = logging.getLogger(__name__)
         mgr = self.connect()
-        try:
-            positions = mgr.PositionGet(int(login_id))
-            if not positions:
-                return []
-            out = []
-            for p in positions:
-                out.append({
-                    'date': getattr(p, 'TimeCreate', None),
-                    'id': getattr(p, 'Position', None),
-                    'symbol': getattr(p, 'Symbol', None),
-                    'volume': round(getattr(p, 'Volume', 0) / 10000, 2),
-                    'price': getattr(p, 'PriceOpen', None),
-                    'profit': getattr(p, 'Profit', None),
-                    'type': 'Buy' if getattr(p, 'Action', None) == 0 else 'Sell',
-                })
-            return out
-        except Exception:
-            return []
+        max_retries = 3
+        retry_delay = 2.0
+
+        for attempt in range(max_retries + 1):
+            try:
+                positions = mgr.PositionGet(int(login_id))
+                if not positions:
+                    return []
+                out = []
+                for p in positions:
+                    out.append({
+                        'date': getattr(p, 'TimeCreate', None),
+                        'id': getattr(p, 'Position', None),
+                        'symbol': getattr(p, 'Symbol', None),
+                        'volume': round(getattr(p, 'Volume', 0) / 10000, 2),
+                        'price': getattr(p, 'PriceOpen', None),
+                        'profit': getattr(p, 'Profit', None),
+                        'type': 'Buy' if getattr(p, 'Action', None) == 0 else 'Sell',
+                    })
+                return out
+            except Exception as e:
+                error_str = str(e).lower()
+                is_network_error = ('network' in error_str or 'connection' in error_str or
+                                  'timeout' in error_str or 'socket' in error_str)
+
+                if is_network_error and attempt < max_retries:
+                    logger.warning(f"Network error getting positions for login {login_id} (attempt {attempt + 1}/{max_retries + 1}): {e}. Retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                    continue
+                else:
+                    logger.error(f"Failed to get positions for login {login_id} after {attempt + 1} attempts: {e}")
+                    return []
 
     def list_accounts_by_index(self):
         """Iterate accounts using UserTotal/UserGet (index based). Returns list of dicts."""
