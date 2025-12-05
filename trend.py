@@ -25,17 +25,9 @@ def display_trend_view(data):
     st.subheader('📈 Net Lot Trend - Line Chart')
     st.write("This chart shows the trend of Net Lot over time for selected symbols. Data updates every 5 seconds.")
 
-    # Auto-refresh every 5 seconds
-    st.markdown("""
-        <script>
-        function autoRefreshTable() {
-            setTimeout(function() {
-                window.location.reload();
-            }, 15000);
-        }
-        autoRefreshTable();
-        </script>
-    """, unsafe_allow_html=True)
+    # Auto-refresh every 15 seconds
+    time.sleep(15)
+    st.experimental_rerun()
 
     if data.empty:
         st.info('No account data available.')
@@ -105,44 +97,95 @@ def display_trend_view(data):
         # ------------------------------
         #   PLOTLY UI (NEW, IMPROVED)
         # ------------------------------
-        for symbol in selected_symbols:
-            st.subheader(f'{symbol} Net Lot')
+        for i in range(0, len(selected_symbols), 2):
+            col1, col2 = st.columns(2)
 
-            symbol_data = chart_data[chart_data['symbol'] == symbol].set_index('timestamp')['net_lot']
+            # First symbol
+            with col1:
+                symbol = selected_symbols[i]
+                st.subheader(f'{symbol} Net Lot')
 
-            fig = go.Figure()
+                symbol_data = chart_data[chart_data['symbol'] == symbol].set_index('timestamp')['net_lot']
 
-            fig.add_trace(go.Scatter(
-                x=symbol_data.index,
-                y=symbol_data.values,
-                mode="lines+markers",
-                line=dict(width=3),
-                marker=dict(size=6),
-                name=symbol,
-            ))
+                fig = go.Figure()
+                numeric_x = (symbol_data.index.view('int64') // 1_000_000)
+                fig.add_trace(go.Scatter(
+                    x=numeric_x,
+                    y=symbol_data.values,
+                    mode="lines+markers",
+                    line=dict(width=3),
+                    marker=dict(size=6),
+                    name=symbol,
+                ))
 
-            # X-axis formatting like screenshot
-            fig.update_xaxes(
-                title="Time",
-                showgrid=True,
-                gridcolor="rgba(255,255,255,0.1)",
-                tickformat="%H:%M<br>%b %d, %Y",
-            )
+                # X-axis formatting like screenshot
+                fig.update_xaxes(
+                    title="Time",
+                    tickformat="%H:%M",      # show time
+                    dtick=900000,            # 15 min = 900,000 ms
+                    showgrid=True,
+                    gridcolor="rgba(255,255,255,0.1)",
+                    type="date"              # force datetime axis
+                )
 
-            fig.update_yaxes(
-                title="Net Lot",
-                showgrid=True,
-                gridcolor="rgba(255,255,255,0.1)",
-            )
+                fig.update_yaxes(
+                    title="Net Lot",
+                    showgrid=True,
+                    gridcolor="rgba(255,255,255,0.1)",
+                )
 
-            # Layout match MT5 style
-            fig.update_layout(
-                height=350,
-                margin=dict(l=20, r=20, t=40, b=20),
-                showlegend=False,
-            )
+                # Layout match MT5 style
+                fig.update_layout(
+                    height=350,
+                    margin=dict(l=20, r=20, t=40, b=20),
+                    showlegend=False,
+                )
 
-            st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True)
+
+            # Second symbol if exists
+            if i + 1 < len(selected_symbols):
+                with col2:
+                    symbol = selected_symbols[i + 1]
+                    st.subheader(f'{symbol} Net Lot')
+
+                    symbol_data = chart_data[chart_data['symbol'] == symbol].set_index('timestamp')['net_lot']
+
+                    fig = go.Figure()
+
+                    fig.add_trace(go.Scatter(
+                        x=symbol_data.index,
+                        y=symbol_data.values,
+                        mode="lines+markers",
+                        line=dict(width=3),
+                        marker=dict(size=6),
+                        name=symbol,
+                    ))
+
+                    # X-axis formatting like screenshot
+                    fig.update_xaxes(
+                    title="Time",
+                    tickformat="%H:%M",      # show time
+                    dtick=900000,            # 15 min = 900,000 ms
+                    showgrid=True,
+                    gridcolor="rgba(255,255,255,0.1)",
+                    type="date"              # force datetime axis
+                    )
+
+                    fig.update_yaxes(
+                        title="Net Lot",
+                        showgrid=True,
+                        gridcolor="rgba(255,255,255,0.1)",
+                    )
+
+                    # Layout match MT5 style
+                    fig.update_layout(
+                        height=350,
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        showlegend=False,
+                    )
+
+                    st.plotly_chart(fig, use_container_width=True)
 
         # Raw data
         with st.expander("📋 View Raw Trend Data"):
