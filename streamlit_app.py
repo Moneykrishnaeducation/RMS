@@ -19,53 +19,14 @@ from XAUUSD import get_xauusd_data
 from groupdashboard import groupdashboard_view
 from file_management import file_management_view  # ⭐ NEW IMPORT
 from watch_manager import watch_manager_view      # ⭐ NEW IMPORT
-
-# Persistence files
-SCANNING_STATUS_FILE = 'scanning_status.json'
-POSITIONS_CACHE_FILE = 'positions_cache.json'
-
-def load_scanning_status():
-    """Load scanning status from file"""
-    if os.path.exists(SCANNING_STATUS_FILE):
-        try:
-            with open(SCANNING_STATUS_FILE, 'r') as f:
-                return json.load(f)
-        except:
-            return {'scanning': False}
-    return {'scanning': False}
-
-def save_scanning_status(status):
-    """Save scanning status to file"""
-    try:
-        with open(SCANNING_STATUS_FILE, 'w') as f:
-            json.dump(status, f)
-    except Exception as e:
-        print(f"Error saving scanning status: {e}")
-
-def load_positions_cache():
-    """Load positions cache from file"""
-    default_cache = {'data': None, 'timestamp': 0, 'scanning': False, 'progress': {'current': 0, 'total': 0}, 'full_scan_done': False, 'stored_tickets': []}
-    if os.path.exists(POSITIONS_CACHE_FILE):
-        try:
-            with open(POSITIONS_CACHE_FILE, 'r') as f:
-                data = json.load(f)
-                # Convert timestamp back to float
-                if 'timestamp' in data:
-                    data['timestamp'] = float(data['timestamp'])
-                # Merge with defaults to ensure new keys are present
-                default_cache.update(data)
-                return default_cache
-        except Exception as e:
-            print(f"Error loading positions cache: {e}")
-    return default_cache
-
-def save_positions_cache(cache):
-    """Save positions cache to file"""
-    try:
-        with open(POSITIONS_CACHE_FILE, 'w') as f:
-            json.dump(cache, f, default=str)  # Use default=str to handle datetime objects
-    except Exception as e:
-        print(f"Error saving positions cache: {e}")
+from backend import load_scanning_status, save_scanning_status, load_positions_cache, save_positions_cache, load_from_mt5, background_position_scanner
+from dashboard import dashboard_view
+from reports import reports_view
+from positions import positions_view
+from pl import pl_view
+# from groups import groups_view
+from matrix_lot_ui import matrix_lot_view
+from usd_matrix import usd_matrix_view
 
 # Load persisted scanning status
 persisted_status = load_scanning_status()
@@ -83,17 +44,9 @@ if 'accounts_cache' not in st.session_state:
         'scanning': False
     }
 
-# Global variables for incremental scanning state (thread-safe)
-full_scan_done = False
-stored_tickets = []
-
 # For backward compatibility, create references
 positions_cache = st.session_state.positions_cache
 accounts_cache = st.session_state.accounts_cache
-
-# Load global variables from cache
-full_scan_done = positions_cache.get('full_scan_done', False)
-stored_tickets = positions_cache.get('stored_tickets', [])
     
 # Custom CSS for attractive navigation bar
 nav_css = """
