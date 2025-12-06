@@ -2,19 +2,12 @@ import streamlit as st
 import pandas as pd
 import io
 from pnl_matrix import get_login_symbol_pnl_matrix
+from streamlit_autorefresh import st_autorefresh
 
-def usd_matrix_view(data):
-    # Auto-refresh every 5 seconds
-    st.markdown("""
-        <script>
-        function autoRefreshTable() {
-            setTimeout(function() {
-                window.location.reload();
-            }, 15000);
-        }
-        autoRefreshTable();
-        </script>
-    """, unsafe_allow_html=True)
+def  usd_matrix_view(data):
+    st_autorefresh(interval=15000, key="refresh_counter")
+
+    st.write("This page refreshes every 15 seconds.")
 
     st.subheader('Login vs Symbol Matrix - USD P&L')
     st.write("This matrix shows the total USD P&L for each login across specified symbols from open positions.")
@@ -24,13 +17,12 @@ def usd_matrix_view(data):
         return
 
     try:
-        with st.spinner('Generating USD P&L matrix...'):
-            # Prepare data dictionary with accounts_df and positions_cache
-            matrix_data = {
-                'accounts_df': data,
-                'positions_cache': st.session_state.positions_cache
-            }
-            matrix_df = get_login_symbol_pnl_matrix(matrix_data)
+        # Prepare data dictionary with accounts_df and positions_cache
+        matrix_data = {
+            'accounts_df': data,
+            'positions_cache': st.session_state.positions_cache
+        }
+        matrix_df = get_login_symbol_pnl_matrix(matrix_data)
 
         if matrix_df.empty:
             st.info('No open positions found for the accounts.')

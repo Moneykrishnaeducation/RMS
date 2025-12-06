@@ -3,7 +3,7 @@ import pandas as pd
 import time
 from MT5Service import MT5Service
 
-def positions_view(data, positions_cache):
+def positions_view( data, positions_cache):
     # Auto-refresh every 5 seconds
     st.markdown("""
         <script>

@@ -6,6 +6,7 @@ from net_lot import get_symbol_net_lot_pnl
 import logging
 import plotly.graph_objects as go
 import plotly.io as pio
+from streamlit_autorefresh import st_autorefresh
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -26,9 +27,8 @@ def display_trend_view(data):
     st.write("This chart shows the trend of Net Lot over time for selected symbols. Data updates every 5 seconds.")
 
     # Auto-refresh every 15 seconds
-    time.sleep(15)
-    st.experimental_rerun()
 
+    st_autorefresh(interval=15000, key="refresh_counter")
     if data.empty:
         st.info('No account data available.')
         return
@@ -108,9 +108,8 @@ def display_trend_view(data):
                 symbol_data = chart_data[chart_data['symbol'] == symbol].set_index('timestamp')['net_lot']
 
                 fig = go.Figure()
-                numeric_x = (symbol_data.index.view('int64') // 1_000_000)
                 fig.add_trace(go.Scatter(
-                    x=numeric_x,
+                    x=symbol_data.index,
                     y=symbol_data.values,
                     mode="lines+markers",
                     line=dict(width=3),
@@ -122,7 +121,7 @@ def display_trend_view(data):
                 fig.update_xaxes(
                     title="Time",
                     tickformat="%H:%M",      # show time
-                    dtick=900000,            # 15 min = 900,000 ms
+                    dtick=5 * 60 * 1000,              # 5 minutes
                     showgrid=True,
                     gridcolor="rgba(255,255,255,0.1)",
                     type="date"              # force datetime axis
@@ -164,12 +163,12 @@ def display_trend_view(data):
 
                     # X-axis formatting like screenshot
                     fig.update_xaxes(
-                    title="Time",
-                    tickformat="%H:%M",      # show time
-                    dtick=900000,            # 15 min = 900,000 ms
-                    showgrid=True,
-                    gridcolor="rgba(255,255,255,0.1)",
-                    type="date"              # force datetime axis
+                        title="Time",
+                        tickformat="%H:%M",      # show time
+                        dtick=5 * 60 * 1000,              # 5 minutes
+                        showgrid=True,
+                        gridcolor="rgba(255,255,255,0.1)",
+                        type="date"              # force datetime axis
                     )
 
                     fig.update_yaxes(
