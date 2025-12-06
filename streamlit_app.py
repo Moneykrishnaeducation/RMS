@@ -19,7 +19,7 @@ from XAUUSD import get_xauusd_data
 from groupdashboard import groupdashboard_view
 from file_management import file_management_view  # ⭐ NEW IMPORT
 from watch_manager import watch_manager_view      # ⭐ NEW IMPORT
-from backend import load_scanning_status, save_scanning_status, load_positions_cache, save_positions_cache, load_from_mt5, background_position_scanner
+from backend import get_initial_caches, save_scanning_status, save_positions_cache, load_from_mt5, background_position_scanner, scan_single_account
 from dashboard import dashboard_view
 from reports import reports_view
 from positions import positions_view
@@ -28,25 +28,14 @@ from pl import pl_view
 from matrix_lot_ui import matrix_lot_view
 from usd_matrix import usd_matrix_view
 
-# Load persisted scanning status
-persisted_status = load_scanning_status()
-
-# Initialize session state for caches (persistent across reruns and page refreshes)
+# Initialize session state for caches using backend (only once per session)
 if 'positions_cache' not in st.session_state:
-    loaded_cache = load_positions_cache()
-    # Merge with persisted scanning status
-    loaded_cache['scanning'] = persisted_status.get('scanning', False)
-    st.session_state.positions_cache = loaded_cache
-
-if 'accounts_cache' not in st.session_state:
-    st.session_state.accounts_cache = {
-        'timestamp': 0,
-        'scanning': False
-    }
-
-# For backward compatibility, create references
-positions_cache = st.session_state.positions_cache
-accounts_cache = st.session_state.accounts_cache
+    positions_cache, accounts_cache = get_initial_caches()
+    st.session_state.positions_cache = positions_cache
+    st.session_state.accounts_cache = accounts_cache
+else:
+    positions_cache = st.session_state.positions_cache
+    accounts_cache = st.session_state.accounts_cache
     
 # Custom CSS for attractive navigation bar
 nav_css = """
@@ -344,7 +333,7 @@ def positions_view(data):
     st.subheader('All Open Positions')
 
     # Use cached data from background scanner
-    global positions_cache
+    positions_cache = st.session_state.positions_cache
 
     # Control buttons
     col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
@@ -354,27 +343,27 @@ def positions_view(data):
             st.rerun()
     with col2:
         if st.button('▶️ Start Scanning', key='start_scanning'):
-            positions_cache['scanning'] = True
-            positions_cache['timestamp'] = 0  # Reset timestamp to force immediate scan
+            st.session_state.positions_cache['scanning'] = True
+            st.session_state.positions_cache['timestamp'] = 0  # Reset timestamp to force immediate scan
             save_scanning_status({'scanning': True})  # Persist scanning status
             st.success("Background scanning started. Will begin scanning all accounts.")
             st.rerun()
     with col3:
         if st.button('⏹️ Stop Scanning', key='stop_scanning'):
-            positions_cache['scanning'] = False
+            st.session_state.positions_cache['scanning'] = False
             save_scanning_status({'scanning': False})  # Persist scanning status
             st.success("Background scanning stopped. Showing current data.")
             st.rerun()
     with col4:
-        if positions_cache['scanning']:
+        if st.session_state.positions_cache['scanning']:
             st.info("🔄 Background scanning is active")
         else:
             st.info("⏹️ Background scanning is stopped")
 
     # Show scanning status
-    st.write(f"Debug scanning status: scanning={positions_cache['scanning']}, progress={positions_cache.get('progress', {})}")
-    if positions_cache['scanning']:
-        progress = positions_cache.get('progress', {})
+    st.write(f"Debug scanning status: scanning={st.session_state.positions_cache['scanning']}, progress={st.session_state.positions_cache.get('progress', {})}")
+    if st.session_state.positions_cache['scanning']:
+        progress = st.session_state.positions_cache.get('progress', {})
         current = progress.get('current', 0)
         total = progress.get('total', 0)
         current_login = progress.get('current_login', '')
@@ -386,8 +375,8 @@ def positions_view(data):
             st.info("🔄 Background position scanning in progress...")
 
         # Show table below scanning even during scan
-        all_positions = positions_cache.get('data', [])
-        last_scan = positions_cache.get('timestamp', 0)
+        all_positions = st.session_state.positions_cache.get('data', [])
+        last_scan = st.session_state.positions_cache.get('timestamp', 0)
         time_since_scan = time.time() - last_scan
 
         df = pd.DataFrame(all_positions)
@@ -431,7 +420,7 @@ def positions_view(data):
             st.dataframe(df_display.iloc[start_row:end_row])
 
         time.sleep(1)  # Brief pause to allow thread updates
-        if positions_cache['scanning']:
+        if st.session_state.positions_cache['scanning']:
             st.rerun()
     elif st.session_state.get('manual_scan_trigger', False):
         st.session_state.manual_scan_trigger = False
@@ -625,160 +614,7 @@ def groups_view(data):
     else:
         st.info('No group data available.')
 
-def scan_single_account(login, svc, accounts_df):
-    """Helper function to scan positions for a single account"""
-    positions_data = []
-    try:
-        positions = svc.get_open_positions(login)
-        if positions:
-            for p in positions:
-                position_data = {
-                    'Login': login,
-                    'ID': p.get('id'),
-                    'Symbol': p.get('symbol'),
-                    'Vol': p.get('volume'),
-                    'Price': p.get('price'),
-                    'P/L': p.get('profit'),
-                    'Type': p.get('type'),
-                    'Date': p.get('date')
-                }
-                # Add account details
-                account_row = accounts_df[accounts_df['login'] == login]
-                if not account_row.empty:
-                    position_data['Name'] = account_row['name'].iloc[0] if 'name' in account_row.columns else ''
-                    position_data['Email'] = account_row['email'].iloc[0] if 'email' in account_row.columns else ''
-                    position_data['Group'] = account_row['group'].iloc[0] if 'group' in account_row.columns else ''
-                positions_data.append(position_data)
-    except Exception as e:
-        print(f"Error scanning positions for login {login}: {e}")
-    return positions_data
 
-def background_position_scanner():
-    """Background thread function to continuously scan open positions simultaneously"""
-
-    print("Background position scanner thread started!")
-    while True:
-        try:
-            current_time = time.time()
-            # Check if we need to scan (only when manually triggered)
-            if positions_cache['scanning']:
-                positions_cache['scanning'] = True
-                print(f"Starting background position scan at {time.strftime('%H:%M:%S')}")
-
-                svc = MT5Service()
-
-                global full_scan_done, stored_tickets
-                if not full_scan_done:
-                    # Full scan: scan all accounts
-                    print("Performing full scan of all accounts...")
-                    accounts = svc.list_accounts_by_groups()
-                    if not accounts:
-                        print("No accounts from groups, trying range scan...")
-                        accounts = svc.list_accounts_by_range(start=1, end=100000)
-
-                    if accounts:
-                        print(f"Found {len(accounts)} accounts to scan")
-                        accounts_df = pd.json_normalize(accounts)
-                        if 'login' in accounts_df.columns:
-                            accounts_df['login'] = accounts_df['login'].astype(str)
-
-                            logins = accounts_df['login'].unique()
-                            total_accounts = len(logins)
-                            positions_cache['progress']['total'] = total_accounts
-                            positions_cache['progress']['current'] = 0
-                            positions_cache['progress']['current_login'] = ''
-
-                            # Scan positions for all accounts simultaneously
-                            all_positions = []
-                            with concurrent.futures.ThreadPoolExecutor(max_workers=min(10, total_accounts)) as executor:
-                                futures = {executor.submit(scan_single_account, login, svc, accounts_df): login for login in logins}
-                                for future in concurrent.futures.as_completed(futures):
-                                    login = futures[future]
-                                    try:
-                                        positions_data = future.result()
-                                        all_positions.extend(positions_data)
-                                        positions_cache['progress']['current'] += 1
-                                        positions_cache['progress']['current_login'] = login
-                                        # Update cache incrementally for dynamic display
-                                        positions_cache['data'] = all_positions
-                                        if positions_cache['progress']['current'] % 100 == 0:
-                                            print(f"Scanned {positions_cache['progress']['current']}/{total_accounts} accounts, found {len(all_positions)} positions so far")
-                                    except Exception as e:
-                                        print(f"Error processing future for login {login}: {e}")
-
-                            # Store tickets for incremental updates
-                            stored_tickets = [p['ID'] for p in all_positions if p.get('ID')]
-                            full_scan_done = True
-
-                            # Final update cache
-                            positions_cache['data'] = all_positions
-                            positions_cache['timestamp'] = current_time
-                            save_positions_cache(positions_cache)  # Persist cache to file
-                            print(f"Full scan completed: {len(all_positions)} positions found from {total_accounts} accounts. Stored {len(stored_tickets)} tickets for incremental updates.")
-
-                            # Sleep for 5 seconds before rescanning if still active
-                            time.sleep(5)
-                    else:
-                        print("No accounts found to scan")
-                        positions_cache['scanning'] = False
-                        save_scanning_status({'scanning': False})
-                else:
-                    # Incremental scan: full scan to update existing and add new positions
-                    print(f"Performing incremental scan (full scan for updates and new positions)...")
-                    accounts = svc.list_accounts_by_groups()
-                    if not accounts:
-                        print("No accounts from groups, trying range scan...")
-                        accounts = svc.list_accounts_by_range(start=1, end=100000)
-
-                    if accounts:
-                        accounts_df = pd.json_normalize(accounts)
-                        if 'login' in accounts_df.columns:
-                            accounts_df['login'] = accounts_df['login'].astype(str)
-
-                            logins = accounts_df['login'].unique()
-                            total_accounts = len(logins)
-                            positions_cache['progress']['total'] = total_accounts
-                            positions_cache['progress']['current'] = 0
-                            positions_cache['progress']['current_login'] = ''
-
-                            all_positions = []
-                            with concurrent.futures.ThreadPoolExecutor(max_workers=min(10, total_accounts)) as executor:
-                                futures = {executor.submit(scan_single_account, login, svc, accounts_df): login for login in logins}
-                                for future in concurrent.futures.as_completed(futures):
-                                    login = futures[future]
-                                    try:
-                                        positions_data = future.result()
-                                        all_positions.extend(positions_data)
-                                        positions_cache['progress']['current'] += 1
-                                        positions_cache['progress']['current_login'] = login
-                                        # Update cache incrementally for dynamic display
-                                        positions_cache['data'] = all_positions
-                                        if positions_cache['progress']['current'] % 100 == 0:
-                                            print(f"Scanned {positions_cache['progress']['current']}/{total_accounts} accounts, found {len(all_positions)} positions so far")
-                                    except Exception as e:
-                                        print(f"Error processing future for login {login}: {e}")
-
-                            # Update stored tickets with all current position IDs
-                            stored_tickets = [p['ID'] for p in all_positions if p.get('ID')]
-
-                            # Final update cache
-                            positions_cache['data'] = all_positions
-                            positions_cache['timestamp'] = current_time
-                            save_positions_cache(positions_cache)  # Persist cache to file
-                            print(f"Incremental scan completed: {len(all_positions)} positions found from {total_accounts} accounts. Updated stored tickets with {len(stored_tickets)} IDs.")
-
-                            # Sleep for 5 seconds before rescanning if still active
-                            time.sleep(5)
-                    else:
-                        print("No accounts found to scan")
-                        positions_cache['scanning'] = False
-
-        except Exception as e:
-            print(f"Error in background position scanner: {e}")
-            positions_cache['scanning'] = False
-
-        # Sleep for 1 second for better responsiveness
-        time.sleep(1)
 
 def matrix_lot_view(data):
     # Auto-refresh every 5 seconds
@@ -866,24 +702,12 @@ def usd_matrix_view(data):
     except Exception as e:
         st.error(f'Failed to generate matrix: {e}')
 
-@st.cache_data(ttl=60)
-def load_from_mt5(use_groups=True):
-    svc = MT5Service()   # persistent connection
 
-    if use_groups:
-        accounts = svc.list_accounts_by_groups()
-    else:
-        accounts = svc.list_accounts_by_range(start=1, end=100000)
-
-    if not accounts:
-        return pd.DataFrame()
-
-    return pd.json_normalize(accounts)
 
 def main():
     # Start background position scanner thread (only once)
     if 'scanner_thread' not in st.session_state or not st.session_state.scanner_thread.is_alive():
-        st.session_state.scanner_thread = threading.Thread(target=background_position_scanner, daemon=True)
+        st.session_state.scanner_thread = threading.Thread(target=background_position_scanner, args=(positions_cache,), daemon=True)
         st.session_state.scanner_thread.start()
 
     st.set_page_config(page_title='RMS - Accounts', layout='wide')

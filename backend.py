@@ -7,51 +7,27 @@ from MT5Service import MT5Service
 import pandas as pd
 import streamlit as st
 
-SCANNING_STATUS_FILE = 'scanning_status.json'
-POSITIONS_CACHE_FILE = 'positions_cache.json'
+def get_initial_caches():
+    """Get initial caches without loading from files"""
+    positions_cache = {'data': None, 'timestamp': 0, 'scanning': False, 'progress': {'current': 0, 'total': 0}, 'full_scan_done': False, 'stored_tickets': []}
+    accounts_cache = {'timestamp': 0, 'scanning': False}
+    return positions_cache, accounts_cache
 
 def load_scanning_status():
-    """Load scanning status from file"""
-    if os.path.exists(SCANNING_STATUS_FILE):
-        try:
-            with open(SCANNING_STATUS_FILE, 'r') as f:
-                return json.load(f)
-        except:
-            return {'scanning': False}
+    """Return default scanning status"""
     return {'scanning': False}
 
 def save_scanning_status(status):
-    """Save scanning status to file"""
-    try:
-        with open(SCANNING_STATUS_FILE, 'w') as f:
-            json.dump(status, f)
-    except Exception as e:
-        print(f"Error saving scanning status: {e}")
+    """No-op: removed JSON storage"""
+    pass
 
 def load_positions_cache():
-    """Load positions cache from file"""
-    default_cache = {'data': None, 'timestamp': 0, 'scanning': False, 'progress': {'current': 0, 'total': 0}, 'full_scan_done': False, 'stored_tickets': []}
-    if os.path.exists(POSITIONS_CACHE_FILE):
-        try:
-            with open(POSITIONS_CACHE_FILE, 'r') as f:
-                data = json.load(f)
-                # Convert timestamp back to float
-                if 'timestamp' in data:
-                    data['timestamp'] = float(data['timestamp'])
-                # Merge with defaults to ensure new keys are present
-                default_cache.update(data)
-                return default_cache
-        except Exception as e:
-            print(f"Error loading positions cache: {e}")
-    return default_cache
+    """Return default positions cache"""
+    return {'data': None, 'timestamp': 0, 'scanning': False, 'progress': {'current': 0, 'total': 0}, 'full_scan_done': False, 'stored_tickets': []}
 
 def save_positions_cache(cache):
-    """Save positions cache to file"""
-    try:
-        with open(POSITIONS_CACHE_FILE, 'w') as f:
-            json.dump(cache, f, default=str)  # Use default=str to handle datetime objects
-    except Exception as e:
-        print(f"Error saving positions cache: {e}")
+    """No-op: removed JSON storage"""
+    pass
 
 @st.cache_data(ttl=60)
 def load_from_mt5(use_groups=True):
