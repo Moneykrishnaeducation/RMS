@@ -110,21 +110,24 @@ def groupdashboard_view(data):
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Groups", total_groups)
     col2.metric("Total Accounts", total_accounts_grouped)
-    col3.metric("Total Net Volume", f"{total_volume:.2f}")
+    col3.metric("Total Net Lot", f"{total_volume:.2f}")
     col4.metric("Total USD P&L", f"${total_usd_pnl:,.2f}")
 
 
-    # ---------- Add derived columns ----------
-    df_grouped["Avg Volume"] = (df_grouped["volume"] / df_grouped["accounts"]).round(2)
+    # ---------- Rename UI columns ----------
+    df_grouped["Avg Net Lot"] = (df_grouped["volume"] / df_grouped["accounts"]).round(2)
     df_grouped["Avg USD P&L"] = (df_grouped["total_usd_pl"] / df_grouped["accounts"]).round(2)
     df_grouped["Total USD P&L"] = df_grouped["total_usd_pl"].apply(lambda v: f"${v:,.2f}")
 
+    df_grouped.rename(columns={
+        "volume": "Net Lot"
+    }, inplace=True)
 
-    # ---------- Final table ----------
     final_cols = [
-        "group", "accounts", "positions", "volume",
-        "Total USD P&L", "Avg Volume", "Avg USD P&L"
+        "group", "accounts", "positions", "Net Lot",
+        "Total USD P&L", "Avg Net Lot", "Avg USD P&L"
     ]
+
 
     st.subheader("📌 Group Summary Table")
     st.dataframe(df_grouped[final_cols], width='stretch')
