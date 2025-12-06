@@ -140,7 +140,7 @@ def display_trend_view(data):
                     showlegend=False,
                 )
 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
 
             # Second symbol if exists
             if i + 1 < len(selected_symbols):
@@ -184,11 +184,11 @@ def display_trend_view(data):
                         showlegend=False,
                     )
 
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
 
         # Raw data
         with st.expander("📋 View Raw Trend Data"):
-            st.dataframe(chart_data.sort_values(['symbol', 'timestamp'], ascending=[True, False]), use_container_width=True)
+            st.dataframe(chart_data.sort_values(['symbol', 'timestamp'], ascending=[True, False]), width='stretch')
 
         st.info("📊 Chart updates automatically every 15 seconds. Refresh the page to update now.")
 

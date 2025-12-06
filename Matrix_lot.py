@@ -1,6 +1,6 @@
 import pandas as pd
 import streamlit as st
-from MT5Service import MT5Service
+# Delay importing MT5Service until needed to avoid import-time/circular issues
 import io
 import logging
 from datetime import datetime
@@ -16,6 +16,7 @@ __all__ = ['get_login_symbol_matrix', 'get_detailed_position_table', 'display_po
 
 @st.cache_data(ttl=5)      # 🔥 Auto-cache for speed (reloads every 5 sec)
 def get_login_symbol_matrix(accounts_df=None, positions_cache=None):
+    from MT5Service import MT5Service
     svc = MT5Service()
 
     if accounts_df is not None and not accounts_df.empty:
@@ -148,6 +149,7 @@ def get_detailed_position_table(accounts_df=None, positions_cache=None):
     logger.info("🔄 LOADING POSITION TABLE - Started")
     logger.info(f"⏰ Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
+    from MT5Service import MT5Service
     svc = MT5Service()
 
     if accounts_df is not None and not accounts_df.empty:
@@ -341,7 +343,7 @@ def display_login_symbol_pivot_table(accounts_df=None, positions_cache=None):
         display_df = display_df.round(2)
         
         # Show with index (Login names)
-        st.dataframe(display_df, use_container_width=True, height=500)
+        st.dataframe(display_df, width='stretch', height=500)
         
         # Log first 2 rows
         logger.info("")
@@ -475,7 +477,7 @@ def display_position_table(accounts_df=None, positions_cache=None, show_details=
             display_df = page_df[['Symbol', 'Login', 'Volume']].copy()
             display_df['Volume'] = display_df['Volume'].round(2)
             st.write(f"Showing {start_idx + 1}-{min(end_idx, total_rows)} of {total_rows} records (Page {st.session_state.position_table_page}/{total_pages})")
-            st.dataframe(display_df, use_container_width=True)
+            st.dataframe(display_df, width='stretch')
         
         with view_tab2:
             st.write("**View One Position at a Time:**")
@@ -533,14 +535,14 @@ def display_position_table(accounts_df=None, positions_cache=None, show_details=
             summary_df.columns = ['Symbol', 'Total Volume', 'Position Count']
             summary_df['Total Volume'] = summary_df['Total Volume'].round(2)
             summary_df = summary_df.sort_values('Total Volume', ascending=False)
-            st.dataframe(summary_df, use_container_width=True)
+            st.dataframe(summary_df, width='stretch')
             
             st.write("**Summary by Login:**")
             login_summary = df.groupby('Login')['Volume'].agg(['sum', 'count']).reset_index()
             login_summary.columns = ['Login', 'Total Volume', 'Position Count']
             login_summary['Total Volume'] = login_summary['Total Volume'].round(2)
             login_summary = login_summary.sort_values('Total Volume', ascending=False)
-            st.dataframe(login_summary, use_container_width=True)
+            st.dataframe(login_summary, width='stretch')
         
         # Export to CSV (always available)
         st.divider()

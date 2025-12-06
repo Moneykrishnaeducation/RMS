@@ -127,7 +127,7 @@ def groupdashboard_view(data):
     ]
 
     st.subheader("📌 Group Summary Table")
-    st.dataframe(df_grouped[final_cols], use_container_width=True)
+    st.dataframe(df_grouped[final_cols], width='stretch')
 
 
 

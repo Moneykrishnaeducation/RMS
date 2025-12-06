@@ -108,7 +108,7 @@ def filter_search_view(data):
     st.subheader(f"{account_type} Matching Filters")
     st.write(f"**{len(filtered_df)} accounts found**")
 
-    st.dataframe(filtered_df, use_container_width=True)
+    st.dataframe(filtered_df, width='stretch')
 
 
     # ⭐ SHOW FULL TABLE (not sliced to 500 rows)
@@ -146,7 +146,7 @@ def demo_accounts_view(data):
     st.write(f'{len(df)} demo accounts found')
 
     # ⭐ SHOW FULL LIST
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(df, width='stretch')
 
     # Top demo accounts
     st.subheader('Top Demo Accounts')

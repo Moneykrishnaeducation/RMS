@@ -66,7 +66,7 @@ def accounts_view(data, accounts_cache):
     st.write(f'{len(df)} accounts matching filters')
 
     # ⭐ FIXED: Show all rows (no 500 row limit)
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(df, width='stretch')
 
     # ------------------------------
     # Top accounts

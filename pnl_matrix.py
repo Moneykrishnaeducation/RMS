@@ -349,7 +349,7 @@ def display_login_symbol_profit_pivot_table(accounts_df=None, positions_cache=No
         with tab_table:
             st.write("**Profit/Loss Matrix (Login × Symbol):**")
             display_df = matrix_df.copy().round(2)
-            st.dataframe(display_df, use_container_width=True, height=500)
+            st.dataframe(display_df, width='stretch', height=500)
 
         # Single Row View: navigate rows one-by-one similar to Matrix_lot.py
         with tab_single:
@@ -402,7 +402,7 @@ def display_login_symbol_profit_pivot_table(accounts_df=None, positions_cache=No
             row_df = record.reset_index()
             row_df.columns = ['Symbol', 'USD P&L']
             row_df['USD P&L'] = row_df['USD P&L'].round(2)
-            st.dataframe(row_df, use_container_width=True, height=350)
+            st.dataframe(row_df, width='stretch', height=350)
 
             # Expandable: full raw row dict
             with st.expander('📋 Full Row Details'):

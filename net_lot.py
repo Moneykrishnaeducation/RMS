@@ -121,7 +121,7 @@ def display_net_lot_view(data):
         # Display table
         display_df = df.copy()
         display_df['usd_pnl'] = display_df['usd_pnl'].apply(lambda x: f"${x:,.2f}")
-        st.dataframe(display_df, use_container_width=True)
+        st.dataframe(display_df, width='stretch')
 
         # Export to CSV
         buf = io.StringIO()

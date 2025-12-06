@@ -7,7 +7,6 @@ import time
 import threading
 import concurrent.futures
 from pnl_matrix import get_login_symbol_pnl_matrix
-from MT5Service import MT5Service
 from accounts import accounts_view
 from profile import profile_view
 from filter_search import filter_search_view      # ⭐ NEW IMPORT
@@ -19,8 +18,7 @@ from XAUUSD import get_xauusd_data
 from groupdashboard import groupdashboard_view
 from file_management import file_management_view  # ⭐ NEW IMPORT
 from watch_manager import watch_manager_view      # ⭐ NEW IMPORT
-from backend import get_initial_caches, save_scanning_status, save_positions_cache, load_from_mt5
-from backend import background_position_scanner
+from backend import get_initial_caches, save_scanning_status, save_positions_cache, load_from_mt5, load_accounts_cache, start_accounts_updater, get_shared_positions_cache, start_positions_scanner
 from dashboard import dashboard_view
 from reports import reports_view
 from positions import positions_view
@@ -29,14 +27,19 @@ from groups import groups_view
 from matrix_lot_ui import matrix_lot_view
 from usd_matrix import usd_matrix_view
 
-# Initialize session state for caches using backend (only once per session)
-if 'positions_cache' not in st.session_state:
-    positions_cache, accounts_cache = get_initial_caches()
-    st.session_state.positions_cache = positions_cache
+# Use process-shared positions cache so all users see the same positions data
+# and avoid each session scanning MT5 directly.
+positions_cache = get_shared_positions_cache()
+accounts_cache = {'timestamp': 0, 'scanning': False}
+if 'accounts_cache' not in st.session_state:
     st.session_state.accounts_cache = accounts_cache
 else:
-    positions_cache = st.session_state.positions_cache
     accounts_cache = st.session_state.accounts_cache
+if 'positions_cache' not in st.session_state:
+    st.session_state.positions_cache = positions_cache
+else:
+    # keep session copy pointing to shared cache
+    st.session_state.positions_cache = positions_cache
     
 # Custom CSS for attractive navigation bar
 nav_css = """
@@ -132,10 +135,30 @@ def render_nav():
     st.markdown('</div>', unsafe_allow_html=True)
 
 def main():
-    # Start background position scanner thread (only once)
-    if 'scanner_thread' not in st.session_state or not st.session_state.scanner_thread.is_alive():
-        st.session_state.scanner_thread = threading.Thread(target=background_position_scanner, args=(positions_cache,), daemon=True)
-        st.session_state.scanner_thread.start()
+    # Start a process-shared positions scanner (idempotent)
+    try:
+        start_positions_scanner()
+    except Exception:
+        pass
+
+    # Ensure the module-level `positions_cache` variable points to the shared cache
+    global positions_cache
+    try:
+        positions_cache = get_shared_positions_cache()
+        st.session_state.positions_cache = positions_cache
+    except Exception:
+        # keep existing value if anything goes wrong
+        pass
+
+    # Start accounts cache updater (server-side) once per Streamlit session process.
+    # This keeps `cache/accounts_cache.json` refreshed so clients don't hit MT5.
+    if 'accounts_updater_started' not in st.session_state or not st.session_state.accounts_updater_started:
+        try:
+            # default interval 300s (5 minutes)
+            start_accounts_updater(300)
+            st.session_state.accounts_updater_started = True
+        except Exception:
+            st.session_state.accounts_updater_started = False
 
     st.set_page_config(page_title='RMS - Accounts', layout='wide')
     st.title('RMS — Accounts Dashboard (Streamlit)')
@@ -225,7 +248,7 @@ def main():
 
 
     st.sidebar.header('Data source')
-    st.sidebar.write('Loading accounts directly from MT5 Manager using `.env` credentials')
+    st.sidebar.write('Loading accounts from backend cache (server-side).')
     data = pd.DataFrame()
     col1, col2 = st.sidebar.columns([3,1])
     with col1:
@@ -233,17 +256,27 @@ def main():
     with col2:
         refresh = st.button('Refresh')
 
+    # By default load accounts from backend cache (pre-fetched by server process).
+    # If the user checks "Force MT5 fetch (admin)" and presses Refresh, we'll fetch
+    # directly from MT5 and update the backend cache. This avoids each client hitting MT5.
+    force_mt5_fetch = st.sidebar.checkbox('Force MT5 fetch (admin)', value=False)
+
     try:
-        if refresh:
-            # clear cache and re-fetch
-            load_from_mt5.clear()
         accounts_cache['scanning'] = True
-        with st.spinner('Loading accounts from MT5...'):
-            data = load_from_mt5(use_groups)
+        # If user explicitly requests a fresh fetch from MT5, clear the cached loader
+        # and call it (it will save to the local backend cache file).
+        if refresh and force_mt5_fetch:
+            load_from_mt5.clear()
+            with st.spinner('Fetching accounts from MT5 and updating backend cache...'):
+                data = load_from_mt5(use_groups)
+        else:
+            with st.spinner('Loading accounts from backend cache...'):
+                data = load_accounts_cache()
+
         accounts_cache['scanning'] = False
         accounts_cache['timestamp'] = time.time()
     except Exception as e:
-        st.error(f'Error loading from MT5: {e}')
+        st.error(f'Error loading account data: {e}')
         data = pd.DataFrame()
         accounts_cache['scanning'] = False
 
