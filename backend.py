@@ -9,7 +9,7 @@ import streamlit as st
 
 def get_initial_caches():
     """Get initial caches without loading from files"""
-    positions_cache = {'data': None, 'timestamp': 0, 'scanning': False, 'progress': {'current': 0, 'total': 0}, 'full_scan_done': False, 'stored_tickets': []}
+    positions_cache = {'data': None, 'timestamp': 0, 'scanning': True, 'progress': {'current': 0, 'total': 0}, 'full_scan_done': False, 'stored_tickets': []}
     accounts_cache = {'timestamp': 0, 'scanning': False}
     return positions_cache, accounts_cache
 

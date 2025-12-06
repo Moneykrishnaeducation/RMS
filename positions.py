@@ -3,7 +3,7 @@ import pandas as pd
 import time
 from MT5Service import MT5Service
 
-def positions_view(data):
+def positions_view(data, positions_cache):
     # Auto-refresh every 5 seconds
     st.markdown("""
         <script>
@@ -19,7 +19,6 @@ def positions_view(data):
     st.subheader('All Open Positions')
 
     # Use cached data from background scanner
-    global positions_cache
 
     # Control buttons
     col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
