@@ -241,6 +241,9 @@ def background_position_scanner(positions_cache):
                             accounts_df['login'] = accounts_df['login'].astype(str)
 
                             logins = accounts_df['login'].unique()
+                            # store the discovered logins so incremental scans don't need to re-fetch accounts
+                            positions_cache['logins'] = list(logins)
+                            positions_cache['accounts_timestamp'] = current_time
                             total_accounts = len(logins)
                             positions_cache['progress']['total'] = total_accounts
                             positions_cache['progress']['current'] = 0
@@ -278,55 +281,67 @@ def background_position_scanner(positions_cache):
                             # Sleep for 5 seconds before rescanning if still active
                             time.sleep(5)
                 else:
-                    # Incremental scan: full scan to update existing and add new positions
-                    print(f"Performing incremental scan (full scan for updates and new positions)...")
-                    accounts = svc.list_accounts_by_groups()
-                    if not accounts:
-                        print("No accounts from groups, trying range scan...")
-                        accounts = svc.list_accounts_by_range(start=1, end=100000)
+                    # Incremental scan: update existing positions using the stored login list
+                    print(f"Performing incremental scan (positions-only for stored logins)...")
+                    logins = positions_cache.get('logins') or []
 
-                    if accounts:
-                        accounts_df = pd.json_normalize(accounts)
-                        if 'login' in accounts_df.columns:
-                            accounts_df['login'] = accounts_df['login'].astype(str)
+                    # If we don't have stored logins (unlikely), fall back to a lightweight fetch
+                    if not logins:
+                        print("No stored logins found for incremental scan, attempting to fetch accounts once...")
+                        try:
+                            accounts = svc.list_accounts_by_groups()
+                            if not accounts:
+                                accounts = svc.list_accounts_by_range(start=1, end=100000)
+                            if accounts:
+                                accounts_df = pd.json_normalize(accounts)
+                                if 'login' in accounts_df.columns:
+                                    accounts_df['login'] = accounts_df['login'].astype(str)
+                                    logins = accounts_df['login'].unique()
+                                    positions_cache['logins'] = list(logins)
+                                    positions_cache['accounts_timestamp'] = current_time
+                        except Exception as e:
+                            print(f"Incremental scan fallback: failed to fetch accounts: {e}")
 
-                            logins = accounts_df['login'].unique()
-                            total_accounts = len(logins)
-                            positions_cache['progress']['total'] = total_accounts
-                            positions_cache['progress']['current'] = 0
-                            positions_cache['progress']['current_login'] = ''
+                    if logins:
+                        total_accounts = len(logins)
+                        positions_cache['progress']['total'] = total_accounts
+                        positions_cache['progress']['current'] = 0
+                        positions_cache['progress']['current_login'] = ''
 
-                            all_positions = []
-                            with concurrent.futures.ThreadPoolExecutor(max_workers=min(10, total_accounts)) as executor:
-                                futures = {executor.submit(scan_single_account, login, svc, accounts_df): login for login in logins}
-                                for future in concurrent.futures.as_completed(futures):
-                                    login = futures[future]
-                                    try:
-                                        positions_data = future.result()
-                                        all_positions.extend(positions_data)
-                                        positions_cache['progress']['current'] += 1
-                                        positions_cache['progress']['current_login'] = login
-                                        # Update cache incrementally for dynamic display
-                                        positions_cache['data'] = all_positions
-                                        if positions_cache['progress']['current'] % 100 == 0:
-                                            print(f"Scanned {positions_cache['progress']['current']}/{total_accounts} accounts, found {len(all_positions)} positions so far")
-                                    except Exception as e:
-                                        print(f"Error processing future for login {login}: {e}")
+                        all_positions = []
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=min(10, total_accounts)) as executor:
+                            # For incremental scanning we can pass an empty accounts_df; scan_single_account will
+                            # still attach account metadata when possible. We provide a small dataframe if available.
+                            accounts_df = None
+                            futures = {executor.submit(scan_single_account, login, svc, accounts_df): login for login in logins}
+                            for future in concurrent.futures.as_completed(futures):
+                                login = futures[future]
+                                try:
+                                    positions_data = future.result()
+                                    all_positions.extend(positions_data)
+                                    positions_cache['progress']['current'] += 1
+                                    positions_cache['progress']['current_login'] = login
+                                    # Update cache incrementally for dynamic display
+                                    positions_cache['data'] = all_positions
+                                    if positions_cache['progress']['current'] % 100 == 0:
+                                        print(f"Scanned {positions_cache['progress']['current']}/{total_accounts} accounts, found {len(all_positions)} positions so far")
+                                except Exception as e:
+                                    print(f"Error processing future for login {login}: {e}")
 
-                            # Update stored tickets with all current position IDs
-                            stored_tickets = [p['ID'] for p in all_positions if p.get('ID')]
-                            positions_cache['stored_tickets'] = stored_tickets
+                        # Update stored tickets with all current position IDs
+                        stored_tickets = [p['ID'] for p in all_positions if p.get('ID')]
+                        positions_cache['stored_tickets'] = stored_tickets
 
-                            # Final update cache
-                            positions_cache['data'] = all_positions
-                            positions_cache['timestamp'] = current_time
-                            save_positions_cache(positions_cache)  # Persist cache to file
-                            print(f"Incremental scan completed: {len(all_positions)} positions found from {total_accounts} accounts. Updated stored tickets with {len(stored_tickets)} IDs.")
+                        # Final update cache
+                        positions_cache['data'] = all_positions
+                        positions_cache['timestamp'] = current_time
+                        save_positions_cache(positions_cache)  # Persist cache to file
+                        print(f"Incremental scan completed: {len(all_positions)} positions found from {total_accounts} accounts. Updated stored tickets with {len(stored_tickets)} IDs.")
 
-                            # Sleep for 5 seconds before rescanning if still active
-                            time.sleep(5)
+                        # Sleep for 5 seconds before rescanning if still active
+                        time.sleep(5)
                     else:
-                        print("No accounts found to scan")
+                        print("No logins available for incremental scan; stopping scanning until manual trigger.")
                         positions_cache['scanning'] = False
                         save_scanning_status({'scanning': False})
 
